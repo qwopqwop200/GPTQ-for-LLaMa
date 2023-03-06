@@ -19,6 +19,7 @@ GPTQ is SOTA one-shot weight quantization method
 | Model([LLaMa-13B](https://arxiv.org/abs/2302.13971))     | Bits | group-size | Wikitext2 |   PTB     |    C4   |
 | ---------                                                | ---- | ---------- | --------- | --------- | ------- |
 | FP16                                                     |  16  |     -      |    5.08   |    8.06   |   6.58  | 
+| RTN                                                      |  4   |     -      |    5.52   |    8.62   |   6.96  | 
 
 According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720) and [GPTQ paper](https://arxiv.org/abs/2210.17323), a lower group-size achieves a lower ppl(perplexity). Therefore, a group-size lower than 128 is recommended.
 
