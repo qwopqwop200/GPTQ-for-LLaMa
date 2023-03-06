@@ -3,7 +3,7 @@
 
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
 
-## result
+## Result
 | Model([LLaMa-7B](https://arxiv.org/abs/2302.13971))      | Bits | group-size | Wikitext2 |   PTB     |    C4   |
 | ---------                                                | ---- | ---------- | --------- | --------- | ------- |
 | FP16                                                     |  16  |     -      |    5.67   |    8.79   |   7.05  | 
