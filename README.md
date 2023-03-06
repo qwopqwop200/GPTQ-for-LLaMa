@@ -65,11 +65,11 @@ CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 # Benchmark language generation with 3-bit LLaMa-7B:
 
 # Save compressed model
-CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 c4 --wbits 3 --save opt175-3bit.pt
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 3 --save opt175-3bit.pt
 # Benchmark generating a 128 token sequence with the saved model
-CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 c4 --load opt175b-3bit.pt --benchmark 128
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load opt175b-3bit.pt --benchmark 128
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
-CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 c4 --benchmark 128
+CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 128
 ```
 
 Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 3-bit kernels are currently only optimized for OPT-175B running on 1xA100 or 2xA6000 and may thus yield suboptimal performance on smaller models or on other GPUs.
