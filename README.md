@@ -13,6 +13,9 @@
 
 According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720), a lower group-size achieves a lower ppl (perplexity). Therefore, a group-size lower than 128 is recommended.
 
+Depending on the GPUs/drivers, there may be a difference in performance, which decreases as the model size increases.(https://github.com/IST-DASLab/gptq/issues/1)
+
+According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the gap between FP16 and GPTQ narrows.
 ## Dependencies
 
 * `torch`: tested on v1.12.1+cu113
