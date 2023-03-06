@@ -14,6 +14,7 @@ GPTQ is SOTA one-shot weight quantization method
 | RTN                                                      |  3   |     -      |    25.66   |    61.25   |   28.19  | 
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |    64      |    **12.24**   |    **16.77**   |   **9.55**  | 
 | RTN                                                      |  2   |     -      |    101940   |    123128   |   109331  | 
+| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  2   |    64      |    **75.28**   |    **241.18**   |   **60.79**  |
 
 According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720) and [GPTQ paper](GPTQ), a lower group-size achieves a lower ppl(perplexity). Therefore, a group-size lower than 128 is recommended.
 
@@ -21,7 +22,7 @@ Depending on the GPUs/drivers, there may be a difference in performance, which d
 
 According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the difference in performance between FP16 and GPTQ decreases.
 
-As with GPTQ, I confirmed that it works well even at surprisingly low 2,3 bits.
+As with GPTQ, I confirmed that it works well even at surprisingly low 3 bits.
 ## Dependencies
 
 * `torch`: tested on v1.12.1+cu113
