@@ -23,6 +23,8 @@ Depending on the GPUs/drivers, there may be a difference in performance, which d
 According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the difference in performance between FP16 and GPTQ decreases.
 
 As with GPTQ, I confirmed that it works well even at surprisingly low 3 bits.
+
+Requires a n-bit cuda kernel to increase speed and reduce memory.
 ## Dependencies
 
 * `torch`: tested on v1.12.1+cu113
