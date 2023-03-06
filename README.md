@@ -20,7 +20,7 @@ GPTQ is SOTA one-shot weight quantization method
 | ---------                                                | ---- | ---------- | --------- | --------- | ------- |
 | FP16                                                     |  16  |     -      |    5.08   |    8.06   |   6.58  | 
 | RTN                                                      |  4   |     -      |    5.52   |    8.62   |   6.96  | 
-
+| RTN                                                      |  3   |     -      |    11.41   |    21.21   |   13.20  | 
 According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720) and [GPTQ paper](https://arxiv.org/abs/2210.17323), a lower group-size achieves a lower ppl(perplexity). Therefore, a group-size lower than 128 is recommended.
 
 Depending on the GPUs/drivers, there may be a difference in performance, which decreases as the model size increases.(https://github.com/IST-DASLab/gptq/issues/1)
@@ -70,9 +70,9 @@ CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 # Benchmark language generation with 3-bit LLaMa-7B:
 
 # Save compressed model
-CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 3 --save opt175-3bit.pt
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 3 --save llama7b-3bit.pt
 # Benchmark generating a 128 token sequence with the saved model
-CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load opt175b-3bit.pt --benchmark 128
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load llama7b-3bit.pt --benchmark 128
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
 CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 128
 ```
