@@ -15,7 +15,7 @@ According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.097
 
 Depending on the GPUs/drivers, there may be a difference in performance, which decreases as the model size increases.(https://github.com/IST-DASLab/gptq/issues/1)
 
-According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the gap between FP16 and GPTQ narrows.
+According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the difference in performance between FP16 and GPTQ decreases.
 ## Dependencies
 
 * `torch`: tested on v1.12.1+cu113
