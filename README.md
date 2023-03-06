@@ -9,7 +9,7 @@
 | FP16                                                     |  16  |     -      |    5.67   |    8.79   |   7.05  | 
 | RTN                                                      |  4   |     -      |    6.28   |    9.68   |   7.70  | 
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |   1024     |    6.98   |   10.81   |   7.99  |
-| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    6.16   |    9.66   |   7.52  | 
+| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    **6.16**   |    **9.66**   |   **7.52**  | 
 
 According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720), a lower group-size achieves a lower ppl (perplexity). Therefore, a group-size lower than 128 is recommended.
 
