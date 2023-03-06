@@ -11,7 +11,7 @@
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |   1024     |    6.98   |   10.81   |   7.99  |
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    **6.16**   |    **9.66**   |   **7.52**  | 
 
-According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720), a lower group-size achieves a lower ppl (perplexity). Therefore, a group-size lower than 128 is recommended.
+According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720), a lower group-size achieves a lower ppl(perplexity). Therefore, a group-size lower than 128 is recommended.
 
 Depending on the GPUs/drivers, there may be a difference in performance, which decreases as the model size increases.(https://github.com/IST-DASLab/gptq/issues/1)
 
