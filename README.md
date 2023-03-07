@@ -93,4 +93,5 @@ Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are cu
 
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
+
 Thanks to Meta AI for releasing [LLaMa](https://arxiv.org/abs/2302.13971), a powerful LLM.
