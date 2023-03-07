@@ -10,6 +10,7 @@ GPTQ is SOTA one-shot weight quantization method
 | ---------                                                | ---- | ---------- | --------- | --------- | ------- |
 | FP16                                                     |  16  |     -      |    5.67   |    8.79   |   7.05  | 
 | RTN                                                      |  4   |     -      |    6.28   |    9.68   |   7.70  | 
+| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |     -      |    6.79   |   10.67   |   8.28  |
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |   1024     |    6.98   |   10.81   |   7.99  |
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    **6.16**   |    **9.66**   |   **7.52**  | 
 | RTN                                                      |  3   |     -      |    25.66   |    61.25   |   28.19  | 
@@ -21,6 +22,7 @@ GPTQ is SOTA one-shot weight quantization method
 | ---------                                                | ---- | ---------- | --------- | --------- | ------- |
 | FP16                                                     |  16  |     -      |    5.08   |    8.06   |   6.58  | 
 | RTN                                                      |  4   |     -      |    5.52   |    8.62   |   6.96  | 
+| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |     -      |    5.35   |   8.40   |  6.82  |
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    **5.18**   |    **8.18**   |   **6.66**  |
 | RTN                                                      |  3   |     -      |    11.41   |    21.21   |   13.20  | 
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |    64      |    **5.50**   |    **8.60**   |   **7.00**  |
@@ -76,6 +78,8 @@ CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load l
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
 CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 2048 --check
 ```
+
+cuda kernel does not support group size.
 
 According to the [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720), 4-bit quantization is the most efficient in zero-shot inference, so i implement 4-bit instead of 3-bit.
 
