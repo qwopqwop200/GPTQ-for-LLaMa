@@ -64,7 +64,7 @@ See `zeroShot/` folder.
 # Install kernels
 python setup_cuda.py install
 
-# Benchmark performance for FC2 layer of OPT-175B
+# Benchmark performance for FC2 layer of LLaMa-33B
 CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 
 # Benchmark language generation with 4-bit LLaMa-7B:
