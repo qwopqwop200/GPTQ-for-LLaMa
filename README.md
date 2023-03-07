@@ -87,6 +87,8 @@ Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are cu
 | FP16                                                    |  16  |     -      |   12980   |   16.63   | 
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971)            |  4   |     -      |   3780    |   10.90   | 
 
+PPL is the benchmarked result using the 128 token setting.
+
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
 Thanks to Meta AI for releasing [LLaMa](https://arxiv.org/abs/2302.13971), a powerful LLM.
