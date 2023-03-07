@@ -300,6 +300,7 @@ def benchmark(model, input_ids, check=False):
                 torch.cuda.synchronize(gpu)
         else:
             torch.cuda.synchronize()
+    max_memory = 0
     with torch.no_grad():
         attention_mask = torch.ones((1, input_ids.numel()), device=DEV)
         times = []
@@ -313,6 +314,7 @@ def benchmark(model, input_ids, check=False):
             sync()
             times.append(time.time() - tick)
             print(i, times[-1])
+            max_memory = max(max_memory,torch.cuda.memory_allocated() / 1024 /1024)
             if check and i != input_ids.numel() - 1:
                 tot += loss(out.logits[0].to(DEV), input_ids[:, (i + 1)].to(DEV)).float()
             cache['past'] = list(out.past_key_values)
@@ -322,6 +324,7 @@ def benchmark(model, input_ids, check=False):
         print('Median:', np.median(times))
         if check:
             print('PPL:', torch.exp(tot / (input_ids.numel() - 1)).item())
+            print('max memory(M):',max_memory)
 
 
 if __name__ == '__main__':
