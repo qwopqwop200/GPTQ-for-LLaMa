@@ -324,7 +324,7 @@ def benchmark(model, input_ids, check=False):
         print('Median:', np.median(times))
         if check:
             print('PPL:', torch.exp(tot / (input_ids.numel() - 1)).item())
-            print('max memory(M):',max_memory)
+            print('max memory(MiB):',max_memory)
 
 
 if __name__ == '__main__':
