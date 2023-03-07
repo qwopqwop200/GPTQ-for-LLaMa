@@ -124,7 +124,7 @@ try:
 except:
     print('CUDA extension not installed.')
 
-# Assumes layer is perfectly divisible into 1024 * 1024 blocks
+# Assumes layer is perfectly divisible into 512 * 512 blocks
 class Quant4Linear(nn.Module): 
 
     def __init__(self, infeatures, outfeatures):
@@ -133,7 +133,7 @@ class Quant4Linear(nn.Module):
         self.register_buffer('scales', torch.zeros((outfeatures, 1)))
         self.register_buffer('bias', torch.zeros(outfeatures))
         self.register_buffer(
-            'qweight', torch.zeros((infeatures // 1024 * 128, outfeatures), dtype=torch.int)
+            'qweight', torch.zeros((infeatures // 512 * 64, outfeatures), dtype=torch.int)
         )
 
     def pack(self, linear, scales, zeros):
@@ -146,7 +146,7 @@ class Quant4Linear(nn.Module):
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
         qweight = np.zeros(
-            (intweight.shape[0] // 1024 * 128, intweight.shape[1]), dtype=np.uint32
+            (intweight.shape[0] // 512 * 64, intweight.shape[1]), dtype=np.uint32
         )
         i = 0
         row = 0
