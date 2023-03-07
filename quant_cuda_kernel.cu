@@ -4,7 +4,7 @@
 #include <cuda_runtime.h>
 
 template <typename scalar_t>
-__global__ void VecQuant3MatMulKernel(
+__global__ void VecQuant4MatMulKernel(
     const  scalar_t* __restrict__ vec,
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
@@ -15,9 +15,9 @@ __global__ void VecQuant3MatMulKernel(
 );
 
 const int BLOCKWIDTH  = 1024;
-const int BLOCKHEIGHT =   96; 
+const int BLOCKHEIGHT =  128; 
 
-void vecquant3matmul_cuda(
+void vecquant4matmul_cuda(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -34,8 +34,8 @@ void vecquant3matmul_cuda(
   dim3 threads(BLOCKWIDTH);
 
   AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "vecquant3matmul_cuda", ([&] {
-      VecQuant3MatMulKernel<<<blocks, threads>>>(
+    vec.type(), "vecquant4matmul_cuda", ([&] {
+      VecQuant4MatMulKernel<<<blocks, threads>>>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
         scales.data<scalar_t>(), zeros.data<scalar_t>(),
         height, width
@@ -49,7 +49,7 @@ __device__ inline unsigned int as_unsigned(int i) {
 }
 
 template <typename scalar_t>
-__global__ void VecQuant3MatMulKernel(
+__global__ void VecQuant4MatMulKernel(
     const  scalar_t* __restrict__ vec,
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
@@ -72,56 +72,20 @@ __global__ void VecQuant3MatMulKernel(
   int i = width * row + col;
   int k = 0;
 
-  unsigned int tmp1;
-  unsigned int tmp2;
   unsigned int tmp;
 
   while (k < BLOCKWIDTH) {
-    tmp1 = as_unsigned(mat[i]);
-    res += (scale * scalar_t((tmp1 >>  0) & 0x7) - zero) * blockvec[k + 0];
-    res += (scale * scalar_t((tmp1 >>  3) & 0x7) - zero) * blockvec[k + 1];
-    res += (scale * scalar_t((tmp1 >>  6) & 0x7) - zero) * blockvec[k + 2];
-    res += (scale * scalar_t((tmp1 >>  9) & 0x7) - zero) * blockvec[k + 3];
-    res += (scale * scalar_t((tmp1 >> 12) & 0x7) - zero) * blockvec[k + 4];
-    res += (scale * scalar_t((tmp1 >> 15) & 0x7) - zero) * blockvec[k + 5];
-    res += (scale * scalar_t((tmp1 >> 18) & 0x7) - zero) * blockvec[k + 6];
-    res += (scale * scalar_t((tmp1 >> 21) & 0x7) - zero) * blockvec[k + 7];
-    res += (scale * scalar_t((tmp1 >> 24) & 0x7) - zero) * blockvec[k + 8];
-    res += (scale * scalar_t((tmp1 >> 27) & 0x7) - zero) * blockvec[k + 9];
+    tmp = as_unsigned(mat[i]);
+    res += (scale * scalar_t((tmp >> 0) & 0xF) - zero) * blockvec[k + 0];
+    res += (scale * scalar_t((tmp >> 4) & 0xF) - zero) * blockvec[k + 1];
+    res += (scale * scalar_t((tmp >> 8) & 0xF) - zero) * blockvec[k + 2];
+    res += (scale * scalar_t((tmp >> 12) & 0xF) - zero) * blockvec[k + 3];
+    res += (scale * scalar_t((tmp >> 16) & 0xF) - zero) * blockvec[k + 4];
+    res += (scale * scalar_t((tmp >> 20) & 0xF) - zero) * blockvec[k + 5];
+    res += (scale * scalar_t((tmp >> 24) & 0xF) - zero) * blockvec[k + 6];
+    res += (scale * scalar_t((tmp >> 28) & 0xF) - zero) * blockvec[k + 7];
     i += width;
-    tmp2 = as_unsigned(mat[i]);
-    tmp = (tmp1 >> 30) | ((tmp2 << 2) & 0x4);
-    tmp2 >>= 1;
-    res += (scale * scalar_t(tmp) - zero) * blockvec[k + 10];
-    k += 11;
-    res += (scale * scalar_t((tmp2 >>  0) & 0x7) - zero) * blockvec[k + 0];
-    res += (scale * scalar_t((tmp2 >>  3) & 0x7) - zero) * blockvec[k + 1];
-    res += (scale * scalar_t((tmp2 >>  6) & 0x7) - zero) * blockvec[k + 2];
-    res += (scale * scalar_t((tmp2 >>  9) & 0x7) - zero) * blockvec[k + 3];
-    res += (scale * scalar_t((tmp2 >> 12) & 0x7) - zero) * blockvec[k + 4];
-    res += (scale * scalar_t((tmp2 >> 15) & 0x7) - zero) * blockvec[k + 5];
-    res += (scale * scalar_t((tmp2 >> 18) & 0x7) - zero) * blockvec[k + 6];
-    res += (scale * scalar_t((tmp2 >> 21) & 0x7) - zero) * blockvec[k + 7];
-    res += (scale * scalar_t((tmp2 >> 24) & 0x7) - zero) * blockvec[k + 8];
-    res += (scale * scalar_t((tmp2 >> 27) & 0x7) - zero) * blockvec[k + 9];
-    i += width;
-    tmp1 = as_unsigned(mat[i]);
-    tmp = (tmp2 >> 30) | ((tmp1 << 1) & 0x6);
-    tmp1 >>= 2;
-    res += (scale * scalar_t(tmp) - zero) * blockvec[k + 10];
-    k += 11;
-    res += (scale * scalar_t((tmp1 >>  0) & 0x7) - zero) * blockvec[k + 0];
-    res += (scale * scalar_t((tmp1 >>  3) & 0x7) - zero) * blockvec[k + 1];
-    res += (scale * scalar_t((tmp1 >>  6) & 0x7) - zero) * blockvec[k + 2];
-    res += (scale * scalar_t((tmp1 >>  9) & 0x7) - zero) * blockvec[k + 3];
-    res += (scale * scalar_t((tmp1 >> 12) & 0x7) - zero) * blockvec[k + 4];
-    res += (scale * scalar_t((tmp1 >> 15) & 0x7) - zero) * blockvec[k + 5];
-    res += (scale * scalar_t((tmp1 >> 18) & 0x7) - zero) * blockvec[k + 6];
-    res += (scale * scalar_t((tmp1 >> 21) & 0x7) - zero) * blockvec[k + 7];
-    res += (scale * scalar_t((tmp1 >> 24) & 0x7) - zero) * blockvec[k + 8];
-    res += (scale * scalar_t((tmp1 >> 27) & 0x7) - zero) * blockvec[k + 9];
-    i += width;
-    k += 10;
+    k += 8;
   }
 
   atomicAdd(&mul[col], res);
