@@ -76,7 +76,7 @@ CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load l
 CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 128
 ```
 
-According to the [paper](https://arxiv.org/abs/2212.09720), 4-bit quantization is the most efficient in zero-shot inference, so i implement 4-bit instead of 3-bit.
+According to the [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720), 4-bit quantization is the most efficient in zero-shot inference, so i implement 4-bit instead of 3-bit.
 
 Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are currently only optimized for OPT-175B running on 1xA100 or 2xA6000 and may thus yield suboptimal performance on smaller models or on other GPUs.
 
