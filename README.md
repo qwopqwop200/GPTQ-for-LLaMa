@@ -25,7 +25,7 @@ GPTQ is SOTA one-shot weight quantization method
 | RTN                                                      |  3   |     -      |    11.41   |    21.21   |   13.20  | 
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |    64      |    **5.50**   |    **8.60**   |   **7.00**  |
 
-Quantizing the model requires a large amount of CPU memory. For example, quantizing a LLaMa-13b model requires 32gb, and LLaMa-33b requires more memory than 64gb.
+Quantizing the model requires a large amount of CPU memory. For example, quantizing a LLaMa-13b model requires 42gb, and LLaMa-33b requires more memory than 64gb.
 
 According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720) and [GPTQ paper](https://arxiv.org/abs/2210.17323), a lower group-size achieves a lower ppl(perplexity). Therefore, a group-size lower than 128 is recommended.
 
@@ -84,8 +84,9 @@ Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are cu
 ## memory usage
 |                           Model                         | Bits | group-size | memory(MiB) |    ppl    |
 | ---------                                               | ---- | ---------- | ----------- | --------- |
-| FP16                                                    |  16  |     -      |    13940    |    5.23   | 
-| [LLaMa-7B](https://arxiv.org/abs/2302.13971)            |  4   |     -      |    4740     |    6.23   | 
+| LLaMa-7B with FP16                                      |  16  |     -      |    13940    |    5.23   | 
+| [LLaMa-7B](https://arxiv.org/abs/2302.13971) with GPTQ  |  4   |     -      |    4740     |    6.23   | 
+| [LLaMa-13B](https://arxiv.org/abs/2302.13971) with GPTQ |  4   |     -      |    8410     |    5.14   | 
 
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
