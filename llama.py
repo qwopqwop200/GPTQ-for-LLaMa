@@ -240,7 +240,7 @@ def load_quant3(model, checkpoint):
 
     print('Loading model ...')
     model.load_state_dict(torch.load(checkpoint))
-    model.seqlen = model.config.max_position_embeddings
+    model.seqlen = 2048
     print('Done.')
 
     return model
