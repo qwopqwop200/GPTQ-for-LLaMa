@@ -86,8 +86,8 @@ Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are cu
 | ------------------------------------------------------------------------------------------- | ---- | ---------- | ----------- | ------------- | --------- | --------- | ------- | ------------------- |
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with FP16                                      |  16  |     -      |    13940    |    5.23   |    5.67   |    8.79   |   7.05  |         12.5        |
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971) with FP16                                     |  16  |     -      |     OOM     |     -     |    5.08   |    8.06   |   6.58  |         24.2        |
-| [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  4   |     -      |    4740     |    6.23   |    6.79   |   10.67   |   8.28  |          3.5        |
-| [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  4   |     -      |    8410     |    5.14   |    5.35   |   8.40   |  6.82  |          6.5        |
+| [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  4   |    512     |    4740     |    6.23   |    6.79   |   10.67   |   8.28  |          3.5        |
+| [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  4   |    512     |    8410     |    5.14   |    5.35   |   8.40   |  6.82  |          6.5        |
 
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
