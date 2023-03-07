@@ -14,8 +14,8 @@ __global__ void VecQuant4MatMulKernel(
     int width
 );
 
-const int BLOCKWIDTH  = 1024;
-const int BLOCKHEIGHT =  128; 
+const int BLOCKWIDTH  = 512;
+const int BLOCKHEIGHT =  64; 
 
 void vecquant4matmul_cuda(
   torch::Tensor vec,
