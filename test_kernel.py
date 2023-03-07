@@ -6,12 +6,12 @@ import quant_cuda
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
-print('Benchmarking OPT-175B FC2 matvec ...')
+print('Benchmarking LLaMa-33B FC2 matvec ...')
 
 DEV = torch.device('cuda:0')
 
-M = 12288
-N = 12288 * 4
+M = 6656
+N = 6656 * 4
 
 DTYPE = torch.half
 mat = torch.randn((M, N), device=DEV, dtype=DTYPE)
@@ -31,7 +31,7 @@ mat = mat.to(DTYPE)
 vec = vec.to(DTYPE)
 mul = mul.to(DTYPE)
 
-mat = torch.randint(-1000000000, 1000000000, (M // 1024 * 128, N), device=DEV, dtype=torch.int)
+mat = torch.randint(-1000000000, 1000000000, (M // 512 * 64, N), device=DEV, dtype=torch.int)
 scales = torch.randn(N, device=DEV, dtype=DTYPE)
 zeros = torch.randn(N, device=DEV, dtype=DTYPE)
 
@@ -45,8 +45,8 @@ print('4bit:', (time.time() - tick) / COUNT)
 
 print('Verifiying kernel correctness ...')
 
-M = 4 * 4096
-N = 4096
+M = 4 * 6656
+N = 6656
 
 layer = nn.Linear(M, N)
 vec = torch.randn(M).to(DEV)
