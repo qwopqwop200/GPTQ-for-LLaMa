@@ -61,7 +61,7 @@ To run other LLaMa models replace `llama-7b-hf` with one of: `llama-13b-hf`, `ll
 
 See `zeroShot/` folder.
 
-## 3-bit CUDA Kernels 
+## 4-bit CUDA Kernels 
 ```
 # Install kernels
 python setup_cuda.py install
@@ -69,12 +69,12 @@ python setup_cuda.py install
 # Benchmark performance for FC2 layer of OPT-175B
 CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 
-# Benchmark language generation with 3-bit LLaMa-7B:
+# Benchmark language generation with 4-bit LLaMa-7B:
 
 # Save compressed model
-CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 3 --save llama7b-3bit.pt
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --save llama7b-4bit.pt
 # Benchmark generating a 128 token sequence with the saved model
-CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load llama7b-3bit.pt --benchmark 128
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load llama7b-34it.pt --benchmark 128
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
 CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 128
 ```
