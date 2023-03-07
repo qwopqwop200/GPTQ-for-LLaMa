@@ -139,7 +139,8 @@ class Quant3Linear(nn.Module):
     def pack(self, linear, scales, zeros):
         self.zeros = zeros * scales
         self.scales = scales.clone()
-        self.bias = linear.bias.clone()
+        if linear.bias is not None:
+            self.bias = linear.bias.clone()
 
         intweight = torch.round((linear.weight.data + self.zeros) / self.scales).to(torch.int)
         intweight = intweight.t().contiguous()
