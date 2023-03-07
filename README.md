@@ -60,9 +60,6 @@ To run other LLaMa models replace `llama-7b-hf` with one of: `llama-13b-hf`, `ll
 See `zeroShot/` folder.
 
 ## 3-bit CUDA Kernels 
-
-**This is an experimental feature. Haven't tested to see if it works yet.**
-
 ```
 # Install kernels
 python setup_cuda.py install
