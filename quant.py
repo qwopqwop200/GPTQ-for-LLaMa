@@ -125,7 +125,7 @@ except:
     print('CUDA extension not installed.')
 
 # Assumes layer is perfectly divisible into 1024 * 1024 blocks
-class Quant3Linear(nn.Module): 
+class Quant4Linear(nn.Module): 
 
     def __init__(self, infeatures, outfeatures):
         super().__init__()
@@ -133,41 +133,27 @@ class Quant3Linear(nn.Module):
         self.register_buffer('scales', torch.zeros((outfeatures, 1)))
         self.register_buffer('bias', torch.zeros(outfeatures))
         self.register_buffer(
-            'qweight', torch.zeros((infeatures // 1024 * 96, outfeatures), dtype=torch.int)
+            'qweight', torch.zeros((infeatures // 1024 * 128, outfeatures), dtype=torch.int)
         )
 
     def pack(self, linear, scales, zeros):
         self.zeros = zeros * scales
         self.scales = scales.clone()
         if linear.bias is not None:
-            self.bias = linear.bias.clone()
+            self.bias = linear.bias.clone()            
 
         intweight = torch.round((linear.weight.data + self.zeros) / self.scales).to(torch.int)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
         qweight = np.zeros(
-            (intweight.shape[0] // 1024 * 96, intweight.shape[1]), dtype=np.uint32
+            (intweight.shape[0] // 1024 * 128, intweight.shape[1]), dtype=np.uint32
         )
         i = 0
         row = 0
         while row < qweight.shape[0]:
-            for j in range(i, i + 10):
-                qweight[row] |= intweight[j] << (3 * (j - i))
-            i += 10
-            qweight[row] |= intweight[i] << 30
-            row += 1
-            qweight[row] |= (intweight[i] >> 2) & 1
-            i += 1
-            for j in range(i, i + 10):
-                qweight[row] |= intweight[j] << (3 * (j - i) + 1)
-            i += 10
-            qweight[row] |= intweight[i] << 31
-            row += 1
-            qweight[row] |= (intweight[i] >> 1) & 0x3
-            i += 1
-            for j in range(i, i + 10):
-                qweight[row] |= intweight[j] << (3 * (j - i) + 2)
-            i += 10
+            for j in range(i, i + 8):
+                qweight[row] |= intweight[j] << (4 * (j - i))
+            i += 8
             row += 1
 
         qweight = qweight.astype(np.int32)
@@ -180,20 +166,20 @@ class Quant3Linear(nn.Module):
             outshape[-1] = self.bias.numel()
             dtype = x.dtype
             x = x.float()
-            quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.zeros)
+            quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.zeros)
             y = y.to(dtype)
             return y.reshape(outshape)
         raise ValueError('Only supports a single token currently.')
 
-def make_quant3(module, names, name=''):
-    if isinstance(module, Quant3Linear):
+def make_quant4(module, names, name=''):
+    if isinstance(module, Quant4Linear):
         return
     for attr in dir(module):
         tmp = getattr(module, attr)
         name1 = name + '.' + attr if name != '' else attr
         if name1 in names:
             setattr(
-                module, attr, Quant3Linear(tmp.in_features, tmp.out_features)
+                module, attr, Quant4Linear(tmp.in_features, tmp.out_features)
             )
     for name1, child in module.named_children():
-        make_quant3(child, names, name + '.' + name1 if name != '' else name1)
+        make_quant4(child, names, name + '.' + name1 if name != '' else name1)
