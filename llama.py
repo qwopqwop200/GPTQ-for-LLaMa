@@ -68,7 +68,6 @@ def llama_sequential(model, dataloader, dev):
     quantizers = {}
     for i in range(len(layers)):
         layer = layers[i].to(dev)
-
         subset = find_layers(layer)
         gptq = {}
         for name in subset:
@@ -158,7 +157,7 @@ def llama_eval(model, testenc, dev):
     for i in range(len(layers)):
         print(i)
         layer = layers[i].to(dev)
-
+        
         if args.nearest:
             subset = find_layers(layer)
             for name in subset:
@@ -204,11 +203,11 @@ def llama_eval(model, testenc, dev):
     model.config.use_cache = use_cache
 
 # TODO: perform packing on GPU
-def llama_pack3(model, quantizers):
+def llama_pack4(model, quantizers):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant3(model, quantizers)
-    qlayers = find_layers(model, [Quant3Linear])
+    make_quant4(model, quantizers)
+    qlayers = find_layers(model, [Quant4Linear])
     print('Packing ...')
     for name in qlayers:
         print(name)
@@ -217,7 +216,7 @@ def llama_pack3(model, quantizers):
     print('Done.')
     return model
 
-def load_quant3(model, checkpoint):
+def load_quant4(model, checkpoint):
     from transformers import LLaMAConfig, LLaMAForCausalLM 
     config = LLaMAConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -236,7 +235,7 @@ def load_quant3(model, checkpoint):
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    make_quant3(model, layers)
+    make_quant4(model, layers)
 
     print('Loading model ...')
     model.load_state_dict(torch.load(checkpoint))
@@ -383,7 +382,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.load:
-        model = load_quant3(args.model, args.load)
+        model = load_quant4(args.model, args.load)
     else:
         model = get_llama(args.model)
         model.eval()
@@ -417,5 +416,5 @@ if __name__ == '__main__':
         llama_eval(model, testloader, DEV)
 
     if args.save:
-        llama_pack3(model, quantizers)
+        llama_pack4(model, quantizers)
         torch.save(model.state_dict(), args.save) 
