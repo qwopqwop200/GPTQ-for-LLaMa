@@ -20,6 +20,7 @@ GPTQ is SOTA one-shot weight quantization method
 | ---------                                                | ---- | ---------- | --------- | --------- | ------- |
 | FP16                                                     |  16  |     -      |    5.08   |    8.06   |   6.58  | 
 | RTN                                                      |  4   |     -      |    5.52   |    8.62   |   6.96  | 
+| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    **5.18**   |    **8.18**   |   **6.66**  |
 | RTN                                                      |  3   |     -      |    11.41   |    21.21   |   13.20  | 
 
 Quantizing the model requires a large amount of CPU memory. For example, quantizing a LLaMa-13b model requires 32gb, and LLaMa-33b requires more memory than 64gb.
