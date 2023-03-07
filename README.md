@@ -84,8 +84,8 @@ Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are cu
 ## memory usage
 |                           Model                         | Bits | group-size | memory(M) |    ppl    |
 | ---------                                               | ---- | ---------- | --------- | --------- |
-| FP16                                                    |  16  |     -      |   12980   |   16.63   | 
-| [LLaMa-7B](https://arxiv.org/abs/2302.13971)            |  4   |     -      |   3780    |   10.90   | 
+| FP16                                                    |  16  |     -      |   12980   |   10.90   | 
+| [LLaMa-7B](https://arxiv.org/abs/2302.13971)            |  4   |     -      |   3780    |   16.63   | 
 
 PPL is the benchmarked result using the 128 token setting.
 
