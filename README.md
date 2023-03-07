@@ -11,8 +11,7 @@ GPTQ is SOTA one-shot weight quantization method
 | FP16                                                     |  16  |     -      |    5.67   |    8.79   |   7.05  | 
 | RTN                                                      |  4   |     -      |    6.28   |    9.68   |   7.70  | 
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |   1024     |    6.98   |   10.81   |   7.99  |
-| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    6.16   |    9.66   |   7.52  | 
-| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    32      |    **6.09**   |    **9.54**   |   **7.38**  | 
+| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    **6.16**   |    **9.66**   |   **7.52**  | 
 | RTN                                                      |  3   |     -      |    25.66   |    61.25   |   28.19  | 
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |    64      |    **12.24**   |    **16.77**   |   **9.55**  | 
 | RTN                                                      |  2   |     -      |    101940   |    123128   |   109331  | 
@@ -83,12 +82,12 @@ According to the [the case for 4-bit precision paper](https://arxiv.org/abs/2212
 Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are currently only optimized for OPT-175B running on 1xA100 or 2xA6000 and may thus yield suboptimal performance on smaller models or on other GPUs.
 
 ## memory usage
-|                           Model                                                             | Bits | group-size | memory(MiB) |    ppl    | checkpoint size(GB) |
-| ------------------------------------------------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
-| [LLaMa-7B](https://arxiv.org/abs/2302.13971) with FP16                                      |  16  |     -      |    13940    |    5.23   |         12.5        |
-| [LLaMa-13B](https://arxiv.org/abs/2302.13971) with FP16                                     |  16  |     -      |     OOM     |     -     |         24.2        |
-| [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  4   |     -      |    4740     |    6.23   |          3.5        |
-| [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  4   |     -      |    8410     |    5.14   |          6.5        |
+|                           Model                                                             | Bits | group-size | memory(MiB) | benchmark ppl | Wikitext2 |   PTB     |    C4   | checkpoint size(GB) |
+| ------------------------------------------------------------------------------------------- | ---- | ---------- | ----------- | ------------- | --------- | --------- | ------- | ------------------- |
+| [LLaMa-7B](https://arxiv.org/abs/2302.13971) with FP16                                      |  16  |     -      |    13940    |    5.23   |    5.67   |    8.79   |   7.05  |         12.5        |
+| [LLaMa-13B](https://arxiv.org/abs/2302.13971) with FP16                                     |  16  |     -      |     OOM     |     -     |    5.08   |    8.06   |   6.58  |         24.2        |
+| [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  4   |     -      |    4740     |    6.23   |    6.79   |   10.67   |   8.28  |          3.5        |
+| [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  4   |     -      |    8410     |    5.14   |    5.35   |   8.40   |  6.82  |          6.5        |
 
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
