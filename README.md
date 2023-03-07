@@ -24,6 +24,8 @@ GPTQ is SOTA one-shot weight quantization method
 | RTN                                                      |  3   |     -      |    11.41   |    21.21   |   13.20  | 
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |    64      |    **5.50**   |    **8.60**   |   **7.00**  |
 
+This code does not support 4-bit CUDA Kernels .
+
 Quantizing the model requires a large amount of CPU memory. For example, quantizing a LLaMa-13b model requires 32gb, and LLaMa-33b requires more memory than 64gb.
 
 According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720) and [GPTQ paper](https://arxiv.org/abs/2210.17323), a lower group-size achieves a lower ppl(perplexity). Therefore, a group-size lower than 128 is recommended.
