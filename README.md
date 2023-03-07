@@ -81,6 +81,12 @@ According to the [the case for 4-bit precision paper](https://arxiv.org/abs/2212
 
 Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are currently only optimized for OPT-175B running on 1xA100 or 2xA6000 and may thus yield suboptimal performance on smaller models or on other GPUs.
 
+## memory usage
+|                           Model                         | Bits | group-size | memory(M) |    ppl    |
+| ---------                                               | ---- | ---------- | --------- | --------- |
+| FP16                                                    |  16  |     -      |   12980   |   16.63   | 
+| [LLaMa-7B](https://arxiv.org/abs/2302.13971)            |  4   |     -      |   3780    |   10.90   | 
+
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
 Thanks to Meta AI for releasing [LLaMa](https://arxiv.org/abs/2302.13971), a powerful LLM.
