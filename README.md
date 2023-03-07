@@ -72,9 +72,9 @@ CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 # Save compressed model
 CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --save llama7b-4bit.pt
 # Benchmark generating a 128 token sequence with the saved model
-CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load llama7b-4bit.pt --benchmark 128 --check
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load llama7b-4bit.pt --benchmark 2048 --check
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
-CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 128 --check
+CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 2048 --check
 ```
 
 According to the [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720), 4-bit quantization is the most efficient in zero-shot inference, so i implement 4-bit instead of 3-bit.
@@ -82,12 +82,10 @@ According to the [the case for 4-bit precision paper](https://arxiv.org/abs/2212
 Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are currently only optimized for OPT-175B running on 1xA100 or 2xA6000 and may thus yield suboptimal performance on smaller models or on other GPUs.
 
 ## memory usage
-|                           Model                         | Bits | group-size | memory(M) |    ppl    |
-| ---------                                               | ---- | ---------- | --------- | --------- |
-| FP16                                                    |  16  |     -      |   12980   |   10.90   | 
-| [LLaMa-7B](https://arxiv.org/abs/2302.13971)            |  4   |     -      |   3780    |   16.63   | 
-
-PPL is the benchmarked result using the 128 token setting.
+|                           Model                         | Bits | group-size | memory(MiB) |    ppl    |
+| ---------                                               | ---- | ---------- | ----------- | --------- |
+| FP16                                                    |  16  |     -      |    13940    |    5.23   | 
+| [LLaMa-7B](https://arxiv.org/abs/2302.13971)            |  4   |     -      |    4740     |    6.23   | 
 
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
