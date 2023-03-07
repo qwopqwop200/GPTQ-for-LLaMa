@@ -24,8 +24,6 @@ GPTQ is SOTA one-shot weight quantization method
 | RTN                                                      |  3   |     -      |    11.41   |    21.21   |   13.20  | 
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |    64      |    **5.50**   |    **8.60**   |   **7.00**  |
 
-This code does not support 4-bit CUDA Kernels .
-
 Quantizing the model requires a large amount of CPU memory. For example, quantizing a LLaMa-13b model requires 32gb, and LLaMa-33b requires more memory than 64gb.
 
 According to [the case for 4-bit precision paper](https://arxiv.org/abs/2212.09720) and [GPTQ paper](https://arxiv.org/abs/2210.17323), a lower group-size achieves a lower ppl(perplexity). Therefore, a group-size lower than 128 is recommended.
@@ -34,7 +32,6 @@ Depending on the GPUs/drivers, there may be a difference in performance, which d
 
 According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the difference in performance between FP16 and GPTQ decreases.
 
-As with GPTQ, I confirmed that it works well even at surprisingly low 3 bits.
 ## Dependencies
 
 * `torch`: tested on v1.12.1+cu113
@@ -78,6 +75,8 @@ CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --load l
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
 CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 128
 ```
+
+According to the [paper](https://arxiv.org/abs/2212.09720), 4-bit quantization is the most efficient in zero-shot inference, so i implement 4-bit instead of 3-bit.
 
 Please note that [GPTQ](https://github.com/IST-DASLab/gptq) 4-bit kernels are currently only optimized for OPT-175B running on 1xA100 or 2xA6000 and may thus yield suboptimal performance on smaller models or on other GPUs.
 
