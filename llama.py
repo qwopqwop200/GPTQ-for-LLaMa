@@ -26,10 +26,10 @@ def llama_sequential(model, dataloader, dev):
 
     use_cache = model.config.use_cache
     model.config.use_cache = False
-    layers = model.model.decoder.layers
+    layers = model.model.layers
 
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
-    model.model.decoder.norm = model.model.decoder.norm.to(dev)
+    model.model.embed_tokens = model.model.embed_tokens.to(dev)
+    model.model.norm = model.model.norm.to(dev)
     layers[0] = layers[0].to(dev)
 
     dtype = next(iter(model.parameters())).dtype
@@ -56,8 +56,8 @@ def llama_sequential(model, dataloader, dev):
     layers[0] = layers[0].module
 
     layers[0] = layers[0].cpu()
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
-    model.model.decoder.norm = model.model.decoder.norm.cpu()
+    model.model.embed_tokens = model.model.embed_tokens.cpu()
+    model.model.norm = model.model.norm.cpu()
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
@@ -93,7 +93,7 @@ def llama_sequential(model, dataloader, dev):
             print(i, name)
             print('Quantizing ...')
             gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize)
-            quantizers['model.decoder.layers.%d.%s' % (i, name)] = gptq[name].quantizer
+            quantizers['model.layers.%d.%s' % (i, name)] = gptq[name].quantizer
             gptq[name].free()
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
@@ -118,9 +118,9 @@ def llama_eval(model, testenc, dev):
 
     use_cache = model.config.use_cache
     model.config.use_cache = False
-    layers = model.model.decoder.layers
+    layers = model.model.layers
 
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
+    model.model.embed_tokens = model.model.embed_tokens.to(dev)
     layers[0] = layers[0].to(dev)
 
     dtype = next(iter(model.parameters())).dtype
@@ -148,7 +148,7 @@ def llama_eval(model, testenc, dev):
     layers[0] = layers[0].module
 
     layers[0] = layers[0].cpu()
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
+    model.model.embed_tokens = model.model.embed_tokens.cpu()
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
@@ -178,16 +178,16 @@ def llama_eval(model, testenc, dev):
         torch.cuda.empty_cache()
         inps, outs = outs, inps
 
-    if model.model.decoder.norm is not None:
-        model.model.decoder.norm = model.model.decoder.norm.to(dev)
+    if model.model.norm is not None:
+        model.model.norm = model.model.norm.to(dev)
     model.lm_head = model.lm_head.to(dev)
 
     testenc = testenc.to(dev)
     nlls = []
     for i in range(nsamples):
         hidden_states = inps[i].unsqueeze(0)
-        if model.model.decoder.norm is not None:
-            hidden_states = model.model.decoder.norm(hidden_states)
+        if model.model.norm is not None:
+            hidden_states = model.model.norm(hidden_states)
         lm_logits = model.lm_head(hidden_states)
         shift_logits = lm_logits[:, :-1, :].contiguous()
         shift_labels = testenc[
@@ -245,9 +245,9 @@ def load_quant4(model, checkpoint):
     return model
 
 def llama_multigpu(model, gpus):
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(gpus[0])
-    if hasattr(model.model.decoder, 'norm') and model.model.decoder.norm:
-        model.model.decoder.norm = model.model.decoder.norm.to(gpus[-1])
+    model.model.embed_tokens = model.model.embed_tokens.to(gpus[0])
+    if hasattr(model.model, 'norm') and model.model.norm:
+        model.model.norm = model.model.norm.to(gpus[-1])
     import copy
     model.lm_head = copy.deepcopy(model.lm_head).to(gpus[-1])
 
@@ -268,7 +268,7 @@ def llama_multigpu(model, gpus):
             tmp = self.module(*inp, **kwargs)
             return tmp
 
-    layers = model.model.decoder.layers
+    layers = model.model.layers
     pergpu = math.ceil(len(layers) / len(gpus))
     for i in range(len(layers)):
         layers[i] = MoveModule(layers[i].to(gpus[i // pergpu]))
@@ -285,7 +285,7 @@ def benchmark(model, input_ids, check=False):
             if cache['past']:
                 cache['past'][i] = None
         return tmp
-    for i, layer in enumerate(model.model.decoder.layers):
+    for i, layer in enumerate(model.model.layers):
         layer.register_forward_hook(clear_past(i))
 
     print('Benchmarking ...')
