@@ -203,11 +203,11 @@ def llama_eval(model, testenc, dev):
     model.config.use_cache = use_cache
 
 # TODO: perform packing on GPU
-def llama_pack4(model, quantizers):
+def llama_pack(model, quantizers, wbits):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant4(model, quantizers)
-    qlayers = find_layers(model, [Quant4Linear])
+    make_quant(model, quantizers, wbits)
+    qlayers = find_layers(model, [QuantLinear])
     print('Packing ...')
     for name in qlayers:
         print(name)
@@ -216,7 +216,7 @@ def llama_pack4(model, quantizers):
     print('Done.')
     return model
 
-def load_quant4(model, checkpoint):
+def load_quant(model, checkpoint, wbits):
     from transformers import LLaMAConfig, LLaMAForCausalLM 
     config = LLaMAConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -235,7 +235,7 @@ def load_quant4(model, checkpoint):
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    make_quant4(model, layers)
+    make_quant(model, layers, wbits)
 
     print('Loading model ...')
     model.load_state_dict(torch.load(checkpoint))
@@ -358,7 +358,7 @@ if __name__ == '__main__':
         help='Whether to run the RTN baseline.'
     ) 
     parser.add_argument(
-        '--wbits', type=int, default=16, choices=[2, 3, 4, 16],
+        '--wbits', type=int, default=16, choices=[2, 3, 4, 8, 16],
         help='#bits to use for quantization; use 16 for evaluating base model.'
     )
     parser.add_argument(
@@ -385,7 +385,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.load:
-        model = load_quant4(args.model, args.load)
+        model = load_quant(args.model, args.load, args.wbits)
     else:
         model = get_llama(args.model)
         model.eval()
@@ -394,7 +394,7 @@ if __name__ == '__main__':
         args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
     )
 
-    if args.wbits < 16 and not args.nearest:
+    if not args.load and args.wbits < 16 and not args.nearest:
         tick = time.time()
         quantizers = llama_sequential(model, dataloader, DEV)
         print(time.time() - tick)
@@ -419,5 +419,5 @@ if __name__ == '__main__':
         llama_eval(model, testloader, DEV)
 
     if args.save:
-        llama_pack4(model, quantizers)
+        llama_pack(model, quantizers, args.wbits)
         torch.save(model.state_dict(), args.save) 
