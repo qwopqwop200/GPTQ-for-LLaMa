@@ -39,19 +39,77 @@ COUNT = 1000
 import time
 tick = time.time()
 for _ in range(COUNT):
+    quant_cuda.vecquant2matmul(vec, mat, mul, scales, zeros)
+    torch.cuda.synchronize()
+print('2bit:', (time.time() - tick) / COUNT)
+
+tick = time.time()
+for _ in range(COUNT):
+    quant_cuda.vecquant3matmul(vec, mat, mul, scales, zeros)
+    torch.cuda.synchronize()
+print('3bit:', (time.time() - tick) / COUNT)
+
+tick = time.time()
+for _ in range(COUNT):
     quant_cuda.vecquant4matmul(vec, mat, mul, scales, zeros)
     torch.cuda.synchronize()
 print('4bit:', (time.time() - tick) / COUNT)
 
+tick = time.time()
+for _ in range(COUNT):
+    quant_cuda.vecquant8matmul(vec, mat, mul, scales, zeros)
+    torch.cuda.synchronize()
+print('8bit:', (time.time() - tick) / COUNT)
 print('Verifiying kernel correctness ...')
 
 M = 4 * 6656
 N = 6656
 
+from quant import *
+
 layer = nn.Linear(M, N)
 vec = torch.randn(M).to(DEV)
 
-from quant import *
+quantizer = Quantizer()
+quantizer.configure(2, perchannel=True, sym=False, mse=False)
+quantizer.find_params(layer.weight.data, weight=True)
+layer.weight.data = quantize(
+    layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
+)
+
+qlayer = QuantLinear(2,layer.in_features, layer.out_features)
+qlayer.pack(layer, quantizer.scale, quantizer.zero)
+
+qlayer = qlayer.to(DEV)
+layer = layer.to(DEV)
+
+with torch.no_grad():
+    print('2bit Simu:', qlayer(vec))
+    print('2bit Kern:', layer.to(DEV)(vec))
+
+layer = nn.Linear(M, N)
+vec = torch.randn(M).to(DEV)
+
+quantizer = Quantizer()
+quantizer.configure(3, perchannel=True, sym=False, mse=False)
+quantizer.find_params(layer.weight.data, weight=True)
+layer.weight.data = quantize(
+    layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
+)
+
+qlayer = QuantLinear(3,layer.in_features, layer.out_features)
+qlayer.pack(layer, quantizer.scale, quantizer.zero)
+
+qlayer = qlayer.to(DEV)
+layer = layer.to(DEV)
+
+with torch.no_grad():
+    print('3bit Simu:', qlayer(vec))
+    print('3bit Kern:', layer.to(DEV)(vec))
+
+layer = nn.Linear(M, N)
+vec = torch.randn(M).to(DEV)
+
 quantizer = Quantizer()
 quantizer.configure(4, perchannel=True, sym=False, mse=False)
 quantizer.find_params(layer.weight.data, weight=True)
@@ -59,12 +117,32 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = Quant4Linear(layer.in_features, layer.out_features)
+qlayer = QuantLinear(4, layer.in_features, layer.out_features)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
 layer = layer.to(DEV)
 
 with torch.no_grad():
-    print('Simu:', qlayer(vec))
-    print('Kern:', layer.to(DEV)(vec))
+    print('4bit Simu:', qlayer(vec))
+    print('4bit Kern:', layer.to(DEV)(vec))
+
+layer = nn.Linear(M, N)
+vec = torch.randn(M).to(DEV)
+
+quantizer = Quantizer()
+quantizer.configure(8, perchannel=True, sym=False, mse=False)
+quantizer.find_params(layer.weight.data, weight=True)
+layer.weight.data = quantize(
+    layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
+)
+
+qlayer = QuantLinear(8, layer.in_features, layer.out_features)
+qlayer.pack(layer, quantizer.scale, quantizer.zero)
+
+qlayer = qlayer.to(DEV)
+layer = layer.to(DEV)
+
+with torch.no_grad():
+    print('8bit Simu:', qlayer(vec))
+    print('8bit Kern:', layer.to(DEV)(vec))
