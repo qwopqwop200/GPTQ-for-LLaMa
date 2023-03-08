@@ -13,6 +13,7 @@ GPTQ is SOTA one-shot weight quantization method
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |     -      |    6.79   |   10.67   |   8.28  |
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    **6.16**   |    **9.66**   |   **7.52**  | 
 | RTN                                                      |  3   |     -      |    25.66   |    61.25   |   28.19  | 
+| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |     -      |    20.86   |   37.54   |   22.19  |
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |    64      |    **12.24**   |    **16.77**   |   **9.55**  | 
 
 | Model([LLaMa-13B](https://arxiv.org/abs/2302.13971))     | Bits | group-size | Wikitext2 |   PTB     |    C4   |
@@ -22,6 +23,7 @@ GPTQ is SOTA one-shot weight quantization method
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |     -      |    5.35   |    8.40   |   6.82  |
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  4   |    64      |    **5.18**   |    **8.18**   |   **6.66**  |
 | RTN                                                      |  3   |     -      |    11.41   |    21.21   |   13.20  | 
+| [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |     -      |    6.80   |    10.45   |   8.31  |
 | [GPTQ](https://arxiv.org/abs/2210.17323)                 |  3   |    64      |    **5.50**   |    **8.60**   |   **7.00**  |
 
 Quantizing the model requires a large amount of CPU memory. For example, quantizing a LLaMa-13b model requires 42gb, and LLaMa-33b requires more memory than 64gb.
