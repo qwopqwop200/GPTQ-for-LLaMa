@@ -226,11 +226,11 @@ def opt_eval(model, testenc, dev):
     model.config.use_cache = use_cache
 
 # TODO: perform packing on GPU
-def opt_pack4(model, quantizers):
+def opt_pack(model, quantizers, wbits):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant4(model, quantizers)
-    qlayers = find_layers(model, [Quant4Linear])
+    make_quant(model, quantizers, wbits)
+    qlayers = find_layers(model, [QuantLinear])
     print('Packing ...')
     for name in qlayers:
         print(name)
@@ -239,7 +239,7 @@ def opt_pack4(model, quantizers):
     print('Done.')
     return model
 
-def load_quant4(model, checkpoint):
+def load_quant(model, checkpoint, wbits):
     from transformers import OPTConfig, OPTForCausalLM 
     config = OPTConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -258,13 +258,12 @@ def load_quant4(model, checkpoint):
     for name in ['model.decoder.project_out', 'model.decoder.project_in', 'lm_head']:
         if name in layers:
             del layers[name]
-    make_quant4(model, layers)
+    make_quant(model, layers, wbits)
 
     print('Loading model ...')
     model.load_state_dict(torch.load(checkpoint))
     model.seqlen = model.config.max_position_embeddings
     print('Done.')
-
     return model
 
 def opt_multigpu(model, gpus):
@@ -383,7 +382,7 @@ if __name__ == '__main__':
         help='Whether to run the RTN baseline.'
     ) 
     parser.add_argument(
-        '--wbits', type=int, default=16, choices=[2, 3, 4, 16],
+        '--wbits', type=int, default=16, choices=[2, 3, 4, 8, 16],
         help='#bits to use for quantization; use 16 for evaluating base model.'
     )
     parser.add_argument(
@@ -410,7 +409,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.load:
-        model = load_quant4(args.model, args.load)
+        model = load_quant(args.model, args.load, args.wbits)
     else:
         model = get_opt(args.model)
         model.eval()
@@ -419,7 +418,7 @@ if __name__ == '__main__':
         args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
     )
 
-    if args.wbits < 16 and not args.nearest:
+    if not args.load and args.wbits < 16 and not args.nearest:
         tick = time.time()
         quantizers = opt_sequential(model, dataloader, DEV)
         print(time.time() - tick)
@@ -444,5 +443,5 @@ if __name__ == '__main__':
         opt_eval(model, testloader, DEV)
 
     if args.save:
-        opt_pack4(model, quantizers)
+        opt_pack(model, quantizers, args.wbits)
         torch.save(model.state_dict(), args.save) 
