@@ -125,37 +125,61 @@ except:
     print('CUDA extension not installed.')
 
 # Assumes layer is perfectly divisible into 512 * 512 blocks
-class Quant4Linear(nn.Module): 
-
-    def __init__(self, infeatures, outfeatures):
+class QuantLinear(nn.Module): 
+    def __init__(self, bits, infeatures, outfeatures):
         super().__init__()
+        if bits not in [2,3,4,8]:
+            raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+        self.bits = bits
         self.register_buffer('zeros', torch.zeros((outfeatures, 1)))
         self.register_buffer('scales', torch.zeros((outfeatures, 1)))
         self.register_buffer('bias', torch.zeros(outfeatures))
         self.register_buffer(
-            'qweight', torch.zeros((infeatures // 512 * 64, outfeatures), dtype=torch.int)
+            'qweight', torch.zeros((infeatures // 512 * (bits * 16), outfeatures), dtype=torch.int)
         )
 
     def pack(self, linear, scales, zeros):
         self.zeros = zeros * scales
         self.scales = scales.clone()
         if linear.bias is not None:
-            self.bias = linear.bias.clone()            
+            self.bias = linear.bias.clone()  
 
         intweight = torch.round((linear.weight.data + self.zeros) / self.scales).to(torch.int)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
         qweight = np.zeros(
-            (intweight.shape[0] // 512 * 64, intweight.shape[1]), dtype=np.uint32
+            (intweight.shape[0] // 512 * (self.bits * 16), intweight.shape[1]), dtype=np.uint32
         )
         i = 0
         row = 0
         while row < qweight.shape[0]:
-            for j in range(i, i + 8):
-                qweight[row] |= intweight[j] << (4 * (j - i))
-            i += 8
-            row += 1
-
+            if self.bits in [2,4,8]:
+                for j in range(i, i + (32//self.bits)):
+                    qweight[row] |= intweight[j] << (self.bits * (j - i))
+                i += 32//self.bits
+                row += 1
+            elif self.bits == 3:
+                for j in range(i, i + 10):
+                    qweight[row] |= intweight[j] << (3 * (j - i))
+                i += 10
+                qweight[row] |= intweight[i] << 30
+                row += 1
+                qweight[row] |= (intweight[i] >> 2) & 1
+                i += 1
+                for j in range(i, i + 10):
+                    qweight[row] |= intweight[j] << (3 * (j - i) + 1)
+                i += 10
+                qweight[row] |= intweight[i] << 31
+                row += 1
+                qweight[row] |= (intweight[i] >> 1) & 0x3
+                i += 1
+                for j in range(i, i + 10):
+                    qweight[row] |= intweight[j] << (3 * (j - i) + 2)
+                i += 10
+                row += 1
+            else:
+                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+                
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight) 
 
@@ -166,20 +190,29 @@ class Quant4Linear(nn.Module):
             outshape[-1] = self.bias.numel()
             dtype = x.dtype
             x = x.float()
-            quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.zeros)
+            if self.bits == 2:
+                quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.zeros)
+            elif self.bits == 3:
+                quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.zeros)
+            elif self.bits == 4:
+                quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.zeros)
+            elif self.bits == 8:
+                quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.zeros)
+            else:
+                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
             y = y.to(dtype)
             return y.reshape(outshape)
         raise ValueError('Only supports a single token currently.')
 
-def make_quant4(module, names, name=''):
-    if isinstance(module, Quant4Linear):
+def make_quant(module, names, bits, name=''):
+    if isinstance(module, QuantLinear):
         return
     for attr in dir(module):
         tmp = getattr(module, attr)
         name1 = name + '.' + attr if name != '' else attr
         if name1 in names:
             setattr(
-                module, attr, Quant4Linear(tmp.in_features, tmp.out_features)
+                module, attr, QuantLinear(bits, tmp.in_features, tmp.out_features)
             )
     for name1, child in module.named_children():
-        make_quant4(child, names, name + '.' + name1 if name != '' else name1)
+        make_quant(child, names, bits, name + '.' + name1 if name != '' else name1)
