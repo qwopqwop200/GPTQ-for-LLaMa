@@ -4,17 +4,6 @@
 #include <cuda_runtime.h>
 
 template <typename scalar_t>
-__global__ void VecQuant1MatMulKernel(
-    const  scalar_t* __restrict__ vec,
-    const       int* __restrict__ mat,
-           scalar_t* __restrict__ mul,
-    const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
-    int height,
-    int width
-);
-
-template <typename scalar_t>
 __global__ void VecQuant2MatMulKernel(
     const  scalar_t* __restrict__ vec,
     const       int* __restrict__ mat,
