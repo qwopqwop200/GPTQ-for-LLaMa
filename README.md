@@ -78,6 +78,8 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 
 ```
 **Currently all kernels other than 4bit are experimental.**
 
+CUDA Kernels support 2,3,4,8 bits.
+
 cuda kernel does not support group size.
 
 Please note that [GPTQ](https://github.com/IST-DASLab/gptq) kernels are currently only optimized for OPT-175B running on 1xA100 or 2xA6000 and may thus yield suboptimal performance on smaller models or on other GPUs.
