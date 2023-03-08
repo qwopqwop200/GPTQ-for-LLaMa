@@ -76,8 +76,6 @@ CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
 CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 2048 --check
 ```
-**Currently all kernels other than 4bit are experimental.**
-
 CUDA Kernels support 2,3,4,8 bits.
 
 Basically, 4-bit quantization is recommended.
