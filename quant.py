@@ -135,7 +135,7 @@ class QuantLinear(nn.Module):
         self.register_buffer('scales', torch.zeros((outfeatures, 1)))
         self.register_buffer('bias', torch.zeros(outfeatures))
         self.register_buffer(
-            'qweight', torch.zeros((infeatures // 512 * (bits * 16), outfeatures), dtype=torch.int)
+            'qweight', torch.zeros((infeatures // 256 * (bits * 8), outfeatures), dtype=torch.int)
         )
 
     def pack(self, linear, scales, zeros):
@@ -148,7 +148,7 @@ class QuantLinear(nn.Module):
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
         qweight = np.zeros(
-            (intweight.shape[0] // 512 * (self.bits * 16), intweight.shape[1]), dtype=np.uint32
+            (intweight.shape[0] // 256 * (self.bits * 8), intweight.shape[1]), dtype=np.uint32
         )
         i = 0
         row = 0
@@ -184,25 +184,24 @@ class QuantLinear(nn.Module):
         self.qweight = torch.from_numpy(qweight) 
 
     def forward(self, x):
-        if x.shape[-1] == x.numel():
-            outshape = list(x.shape)
-            y = self.bias.clone()
-            outshape[-1] = self.bias.numel()
-            dtype = x.dtype
-            x = x.float()
-            if self.bits == 2:
-                quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.zeros)
-            elif self.bits == 3:
-                quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.zeros)
-            elif self.bits == 4:
-                quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.zeros)
-            elif self.bits == 8:
-                quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.zeros)
-            else:
-                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-            y = y.to(dtype)
-            return y.reshape(outshape)
-        raise ValueError('Only supports a single token currently.')
+        outshape = list(x.shape)
+        x = x.reshape(-1, x.shape[-1])
+        y = self.bias.clone().repeat(x.shape[0],1)
+        outshape[-1] = self.bias.numel()
+        dtype = x.dtype
+        x = x.float()
+        if self.bits == 2:
+            quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.zeros)
+        elif self.bits == 3:
+            quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.zeros)
+        elif self.bits == 4:
+            quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.zeros)
+        elif self.bits == 8:
+            quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.zeros)
+        else:
+            raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+        y = y.to(dtype)
+        return y.reshape(outshape)
 
 def make_quant(module, names, bits, name=''):
     if isinstance(module, QuantLinear):
