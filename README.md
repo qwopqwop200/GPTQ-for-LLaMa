@@ -75,6 +75,9 @@ CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 
 CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --load llama7b-4bit.pt --benchmark 2048 --check
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
 CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 --benchmark 2048 --check
+
+# model inference with the saved model
+CUDA_VISIBLE_DEVICES=0 python llama_inference.py decapoda-research/llama-7b-hf --wbits 4 --load llama7b-4bit.pt --text "this is llama"
 ```
 CUDA Kernels support 2,3,4,8 bits.
 
