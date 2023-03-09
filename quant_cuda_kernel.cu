@@ -80,7 +80,7 @@ void vecquant2matmul_cuda(
   dim3 blocks(
     (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2,
     (width + BLOCKWIDTH - 1) / BLOCKWIDTH,
-	 batch
+    batch
   );
   dim3 threads(BLOCKWIDTH);
 
@@ -164,7 +164,7 @@ void vecquant3matmul_cuda(
   dim3 blocks(
     (height + BLOCKHEIGHT3 - 1) / BLOCKHEIGHT3,
     (width + BLOCKWIDTH - 1) / BLOCKWIDTH,
-	 batch
+    batch
   );
   dim3 threads(BLOCKWIDTH);
 
@@ -276,7 +276,7 @@ void vecquant4matmul_cuda(
   dim3 blocks(
     (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4,
     (width + BLOCKWIDTH - 1) / BLOCKWIDTH,
-	 batch
+    batch
   );
   dim3 threads(BLOCKWIDTH);
 
@@ -352,7 +352,7 @@ void vecquant8matmul_cuda(
   dim3 blocks(
     (height + BLOCKHEIGHT8 - 1) / BLOCKHEIGHT8,
     (width + BLOCKWIDTH - 1) / BLOCKWIDTH,
-	 batch
+    batch
   );
   dim3 threads(BLOCKWIDTH);
 
