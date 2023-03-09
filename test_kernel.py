@@ -6,17 +6,19 @@ import quant_cuda
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
-print('Benchmarking LLaMa-33B FC2 matvec ...')
+print('Benchmarking LLaMa-7B FC2 matvec ...')
 
 DEV = torch.device('cuda:0')
 
-M = 6656
-N = 6656 * 4
+B = 5
+L = 128
+M = 4096
+N = 11008
 
 DTYPE = torch.half
 mat = torch.randn((M, N), device=DEV, dtype=DTYPE)
-vec = torch.randn((1, M), device=DEV, dtype=DTYPE)
-mul = torch.zeros((1, N), device=DEV, dtype=DTYPE)
+vec = torch.randn((B, M), device=DEV, dtype=DTYPE)
+mul = torch.zeros((B, N), device=DEV, dtype=DTYPE)
 
 COUNT = 1000
 import time
@@ -31,7 +33,7 @@ mat = mat.to(DTYPE)
 vec = vec.to(DTYPE)
 mul = mul.to(DTYPE)
 
-mat = torch.randint(-1000000000, 1000000000, (M // 512 * 64, N), device=DEV, dtype=torch.int)
+mat = torch.randint(-1000000000, 1000000000, (M // 256 * 32, N), device=DEV, dtype=torch.int)
 scales = torch.randn(N, device=DEV, dtype=DTYPE)
 zeros = torch.randn(N, device=DEV, dtype=DTYPE)
 
@@ -62,13 +64,13 @@ for _ in range(COUNT):
 print('8bit:', (time.time() - tick) / COUNT)
 print('Verifiying kernel correctness ...')
 
-M = 4 * 6656
-N = 6656
+M = 4096
+N = 11008
 
 from quant import *
 
 layer = nn.Linear(M, N)
-vec = torch.randn(M).to(DEV)
+vec = torch.randn(B,L,M).to(DEV)
 
 quantizer = Quantizer()
 quantizer.configure(2, perchannel=True, sym=False, mse=False)
@@ -84,11 +86,14 @@ qlayer = qlayer.to(DEV)
 layer = layer.to(DEV)
 
 with torch.no_grad():
+    print(layer.to(DEV)(vec).shape)
+    print(qlayer(vec).shape)
     print('2bit Simu:', qlayer(vec))
     print('2bit Kern:', layer.to(DEV)(vec))
-
+    print('\n')
+    
 layer = nn.Linear(M, N)
-vec = torch.randn(M).to(DEV)
+vec = torch.randn(B,L,M).to(DEV)
 
 quantizer = Quantizer()
 quantizer.configure(3, perchannel=True, sym=False, mse=False)
@@ -106,9 +111,10 @@ layer = layer.to(DEV)
 with torch.no_grad():
     print('3bit Simu:', qlayer(vec))
     print('3bit Kern:', layer.to(DEV)(vec))
-
+    print('\n')
+    
 layer = nn.Linear(M, N)
-vec = torch.randn(M).to(DEV)
+vec = torch.randn(B,L,M).to(DEV)
 
 quantizer = Quantizer()
 quantizer.configure(4, perchannel=True, sym=False, mse=False)
@@ -126,9 +132,10 @@ layer = layer.to(DEV)
 with torch.no_grad():
     print('4bit Simu:', qlayer(vec))
     print('4bit Kern:', layer.to(DEV)(vec))
+    print('\n')
 
 layer = nn.Linear(M, N)
-vec = torch.randn(M).to(DEV)
+vec = torch.randn(B,L,M).to(DEV)
 
 quantizer = Quantizer()
 quantizer.configure(8, perchannel=True, sym=False, mse=False)
