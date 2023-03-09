@@ -91,6 +91,7 @@ cuda kernel does not support group size.
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with FP16                                      |  16  |    13940    |    5.23   |    5.67   |    8.79   |   7.05  |         12.5        |
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971) with FP16                                     |  16  |     OOM     |     -     |    5.08   |    8.06   |   6.58  |         24.2        |
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  8   |    7748     |    5.39   |    5.67   |   8.81   |   7.08  |          6.5        |
+| [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  8   |    14570     |    5.00   |    5.09   |   8.06   |  6.61  |          12.4        |
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  4   |    4740     |    6.23   |    6.79   |   10.67   |   8.28  |          3.5        |
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  4   |    8410     |    5.14   |    5.35   |   8.40   |  6.82  |          6.5        |
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  3   |    3852     |    11.43  |    17.94  |   31.44   |   19.65  |          2.75        |
