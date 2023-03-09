@@ -184,25 +184,28 @@ class QuantLinear(nn.Module):
         self.qweight = torch.from_numpy(qweight) 
 
     def forward(self, x):
-        if x.shape[-1] == x.numel():
-            outshape = list(x.shape)
+        tempshape = [x.numel()//x.shape[-1],x.shape[-1]]
+        x_tmp = x.reshape(tempshape)
+        outlist = []
+        for i in range(tempshape[0]):
             y = self.bias.clone()
-            outshape[-1] = self.bias.numel()
-            dtype = x.dtype
-            x = x.float()
+            xi = x_tmp[i].float()
             if self.bits == 2:
-                quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.zeros)
+                quant_cuda.vecquant2matmul(xi, self.qweight, y, self.scales, self.zeros)
             elif self.bits == 3:
-                quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.zeros)
+                quant_cuda.vecquant3matmul(xi, self.qweight, y, self.scales, self.zeros)
             elif self.bits == 4:
-                quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.zeros)
+                quant_cuda.vecquant4matmul(xi, self.qweight, y, self.scales, self.zeros)
             elif self.bits == 8:
-                quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.zeros)
+                quant_cuda.vecquant8matmul(xi, self.qweight, y, self.scales, self.zeros)
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-            y = y.to(dtype)
-            return y.reshape(outshape)
-        raise ValueError('Only supports a single token currently.')
+            y = y.to(x.dtype)
+            outlist.append(y)
+        out = torch.stack(outlist)
+        outshape = list(x.shape)
+        outshape[-1] = self.bias.numel()
+        return out.reshape(outshape)
 
 def make_quant(module, names, bits, name=''):
     if isinstance(module, QuantLinear):
