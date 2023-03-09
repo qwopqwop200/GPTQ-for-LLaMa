@@ -82,8 +82,6 @@ Basically, 4-bit quantization is recommended.
 
 cuda kernel does not support group size.
 
-Please note that [GPTQ](https://github.com/IST-DASLab/gptq) kernels are currently only optimized for OPT-175B running on 1xA100 or 2xA6000 and may thus yield suboptimal performance on smaller models or on other GPUs.
-
 ## Memory Usage
 |                           Model                                                             | Bits | memory(MiB) | benchmark(ppl) | Wikitext2 |   PTB     |    C4   | checkpoint size(GB) |
 | ------------------------------------------------------------------------------------------- | ---- | ----------- | ------------- | --------- | --------- | ------- | ------------------- |
