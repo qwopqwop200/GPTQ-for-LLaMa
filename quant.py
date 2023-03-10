@@ -124,7 +124,7 @@ try:
 except:
     print('CUDA extension not installed.')
 
-# Assumes layer is perfectly divisible into 512 * 512 blocks
+# Assumes layer is perfectly divisible into 256 * 256 blocks
 class QuantLinear(nn.Module): 
     def __init__(self, bits, infeatures, outfeatures):
         super().__init__()
