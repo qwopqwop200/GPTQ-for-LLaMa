@@ -100,6 +100,7 @@ cuda kernel does not support group size.
 | [LLaMa-33B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  3   |    15499     |    5.10   |   5.78   |   8.98   |  7.38  |    12.94   |
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  2   |    3076     |    4152  |    30749  |   45936   |   5045  |          2.0        |
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  2   |    5275     |    6903   |   13203   |   1384   |  8.34  |          5.06        |
+| [LLaMa-33B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  2   |     11635    |   66.58    |   -   |   -   |  -  |    8.9   |
 
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
