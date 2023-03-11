@@ -71,6 +71,8 @@ CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 
 # Save compressed model
 CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --save llama7b-4bit.pt
+# Or save compressed `.safetensors` model
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --save_safetensors llama7b-4bit.safetensors
 # Benchmark generating a 2048 token sequence with the saved model
 CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --load llama7b-4bit.pt --benchmark 2048 --check
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
