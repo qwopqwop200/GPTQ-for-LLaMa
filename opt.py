@@ -455,6 +455,6 @@ if __name__ == '__main__':
         torch.save(model.state_dict(), args.save) 
 
     if args.save_safetensors:
-        llama_pack(model, quantizers, args.wbits)
+        opt_pack(model, quantizers, args.wbits)
         from safetensors.torch import save_file as safe_save
         safe_save(model.state_dict(), args.save_safetensors)
