@@ -94,11 +94,14 @@ cuda kernel does not support group size.
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  8   |    14570     |    5.00   |    5.09   |   8.06   |  6.61  |          12.4        |
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  4   |    4740     |    6.23   |    6.79   |   10.67   |   8.28  |          3.5        |
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  4   |    8410     |    5.14   |    5.35   |   8.40   |  6.82  |          6.5        |
+| [LLaMa-33B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  4   |    19499     |    4.59   |   4.45   |   7.58   |  6.22  |    16.9   |
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  3   |    3852     |    11.43  |    17.94  |   31.44   |   19.65  |          2.75        |
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  3   |    6870     |    5.58   |    6.77   |   10.29   |  8.34  |          5.06        |
+| [LLaMa-33B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  3   |    15499     |    5.10   |   5.78   |   8.98   |  7.38  |    12.94   |
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323)  |  2   |    3076     |    4152  |    30749  |   45936   |   5045  |          2.0        |
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  2   |    5275     |    6903   |   13203   |   1384   |  8.34  |          5.06        |
-| [LLaMa-33B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  4   |    19499     |    4.59   |   -   |   -   |  -  |    15.7   |
+| [LLaMa-33B](https://arxiv.org/abs/2302.13971) with [GPTQ](https://arxiv.org/abs/2210.17323) |  2   |     11635    |   66.58    |   -   |   -   |  -  |    8.9   |
+
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
 
