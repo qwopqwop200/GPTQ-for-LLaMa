@@ -32,13 +32,24 @@ Depending on the GPUs/drivers, there may be a difference in performance, which d
 
 According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the difference in performance between FP16 and GPTQ decreases.
 
+## Installation
+If you don't have [conda](https://docs.conda.io/en/latest/miniconda.html), install it first.
+```
+conda create --name gptq python=3.9 -y
+conda activate gptq
+pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+
+git clone https://github.com/qwopqwop200/GPTQ-for-LLaMa
+cd GPTQ-for-LLaMa
+pip install -r requirements.txt
+```
 ## Dependencies
 
-* `torch`: tested on v1.12.1+cu113
+* `torch`: tested on v1.13.1+cu116
 * `transformers`: [tested on v4.27.0.dev0(required)](https://github.com/zphang/transformers/tree/llama_push)
 * `datasets`: tested on v2.10.1
 * `safetensors`: tested on v0.3.0
-* (to run 4-bit kernels: setup for compiling PyTorch CUDA extensions, see also https://pytorch.org/tutorials/advanced/cpp_extension.html, tested on CUDA 11.3)
+* (to run 4-bit kernels: setup for compiling PyTorch CUDA extensions, see also https://pytorch.org/tutorials/advanced/cpp_extension.html, tested on CUDA 11.6)
 
 All experiments were run on a single NVIDIA RTX3090.
 
