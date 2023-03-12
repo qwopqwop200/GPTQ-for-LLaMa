@@ -37,6 +37,7 @@ According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the 
 * `torch`: tested on v1.12.1+cu113
 * `transformers`: [tested on v4.27.0.dev0(required)](https://github.com/zphang/transformers/tree/llama_push)
 * `datasets`: tested on v2.10.1
+* `safetensors`: tested on v0.3.0
 * (to run 4-bit kernels: setup for compiling PyTorch CUDA extensions, see also https://pytorch.org/tutorials/advanced/cpp_extension.html, tested on CUDA 11.3)
 
 All experiments were run on a single NVIDIA RTX3090.
@@ -71,6 +72,8 @@ CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 
 # Save compressed model
 CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --save llama7b-4bit.pt
+# Or save compressed `.safetensors` model
+CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --save_safetensors llama7b-4bit.safetensors
 # Benchmark generating a 2048 token sequence with the saved model
 CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4 --wbits 4 --load llama7b-4bit.pt --benchmark 2048 --check
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs

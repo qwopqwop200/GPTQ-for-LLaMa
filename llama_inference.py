@@ -45,7 +45,11 @@ def load_quant(model, checkpoint, wbits):
     make_quant(model, layers, wbits)
 
     print('Loading model ...')
-    model.load_state_dict(torch.load(checkpoint))
+    if checkpoint.endswith('.safetensors'):
+        from safetensors.torch import load_file as safe_load
+        model.load_state_dict(safe_load(checkpoint))
+    else:
+        model.load_state_dict(torch.load(checkpoint))
     model.seqlen = 2048
     print('Done.')
 
