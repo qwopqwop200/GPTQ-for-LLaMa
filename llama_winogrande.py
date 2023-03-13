@@ -122,7 +122,7 @@ def test_one_sample(sample, model, tokenizer):
 
 
 def eval_winogrande(model, tokenizer):
-    dataset = load_dataset("winogrande", "winograde_debiased", split="train")
+    dataset = load_dataset("winogrande", args.dataset, split=args.split)
     samples = []
     for i in range(len(dataset)):
         samples.append(dataset[i])
@@ -173,12 +173,24 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--limit_tests', type=int, default=None,
-        help='To reduce the number of tests to execute. It defaults to the full train dataset (9248)'
+        help='To reduce the number of tests to execute. (default is complete set)'
+    )
+
+    parser.add_argument(
+        '--dataset', type=str, default='winogrande_debiased',
+        help='The winogrande dataset to be used (https://huggingface.co/datasets/winogrande)'
+    )
+
+    parser.add_argument(
+        '--split', type=str, default='train',
+        help='The WinoGrande datasplit to be used (test can not be used the expected answers are missing)'
     )
 
     args = parser.parse_args()
 
     if args.load:
+        if type(args.load) is not str:
+            args.load = args.load.as_posix()
         model = load_quant(args.model, args.load, args.wbits)
     else:
         model = get_llama(args.model)
