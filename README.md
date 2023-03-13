@@ -37,7 +37,7 @@ If you don't have [conda](https://docs.conda.io/en/latest/miniconda.html), insta
 ```
 conda create --name gptq python=3.9 -y
 conda activate gptq
-pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia
 
 git clone https://github.com/qwopqwop200/GPTQ-for-LLaMa
 cd GPTQ-for-LLaMa
