@@ -10,8 +10,9 @@ from quant import *
 from transformers import AutoTokenizer
 from tqdm import tqdm
 import json
+from datasets import load_dataset
 
-DEV = torch.device('cuda:0')
+
 
 
 def get_llama(model):
@@ -97,12 +98,10 @@ def test_one_sample(sample, model, tokenizer):
     generated_ids = model.generate(
         input_ids,
         do_sample=True,
-        min_length=args.min_length,
+        min_length=3,  # has to be changed together with the prompt
         top_p=args.top_p,
         temperature=args.temperature,
-        max_new_tokens=3,
-        top_k=35
-
+        max_new_tokens=3  # has to be changed together with the prompt
     )
     answer = tokenizer.decode([el.item() for el in generated_ids[0]])[-1]
     # Llama (at least the 7B) won't answer at all with 1 or 2 as option but works with A or B
@@ -122,22 +121,23 @@ def test_one_sample(sample, model, tokenizer):
     return success
 
 
-def eval_winogbrande(model, tokenizer):
+def eval_winogrande(model, tokenizer):
+    dataset = load_dataset("winogrande", "winograde_debiased", split="train")
     samples = []
-    with open("winogrande/train_debiased.jsonl") as dataset:
-        for line in dataset:
-            sample = json.loads(line)
-            samples.append(sample)
+    for i in range(len(dataset)):
+        samples.append(dataset[i])
+    if args.limit_tests:
+        samples = samples[0:min(args.limit_tests, len(samples))]
     total = len(samples)
     correct = 0
 
-
-    for i, sample in enumerate(tqdm(samples, "Testing")):
+    for i in tqdm(range(total), "Testing"):
+        sample = samples[i]
         print("-----------------------------------")
         result = test_one_sample(sample, model, tokenizer)
         if result:
             correct+=1
-        print("Rate: " + str(correct/(i+1)*100)+"%")
+        print("Correct: " + str(correct/(i+1)*100)+"%")
 
 
 
@@ -161,28 +161,19 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
-        '--text', type=str,
-        help='input text'
-    )
-
-    parser.add_argument(
-        '--min_length', type=int, default=10,
-        help='The minimum length of the sequence to be generated.'
-    )
-
-    parser.add_argument(
-        '--max_length', type=int, default=50,
-        help='The maximum length of the sequence to be generated.'
-    )
-
-    parser.add_argument(
         '--top_p', type=float, default=0.95,
         help='If set to float < 1, only the smallest set of most probable tokens with probabilities that add up to top_p or higher are kept for generation.'
     )
 
+
     parser.add_argument(
         '--temperature', type=float, default=0.8,
         help='The value used to module the next token probabilities.'
+    )
+
+    parser.add_argument(
+        '--limit_tests', type=int, default=None,
+        help='To reduce the number of tests to execute. It defaults to the full train dataset (9248)'
     )
 
     args = parser.parse_args()
@@ -197,6 +188,6 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained(args.model)
 
     with torch.no_grad():
-        eval_winogbrande(model, tokenizer)
+        eval_winogrande(model, tokenizer)
 
     print()
