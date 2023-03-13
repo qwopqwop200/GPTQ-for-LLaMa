@@ -263,7 +263,7 @@ if __name__ == '__main__':
     )
     
     parser.add_argument(
-        '--pre_layer', type=float, default=50,
+        '--pre_layer', type=int, default=50,
         help='The number of layers to preload'
     )
     
