@@ -94,7 +94,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py decapoda-research/llama-7b-hf c4 
 CUDA_VISIBLE_DEVICES=0 python llama_inference.py decapoda-research/llama-7b-hf --wbits 4 --load llama7b-4bit.pt --text "this is llama"
 # model inference with the saved model with offload(This is very slow. This is a simple implementation and could be improved with technologies like flexgen(https://github.com/FMInference/FlexGen).
 CUDA_VISIBLE_DEVICES=0 python llama_inference_offload.py decapoda-research/llama-7b-hf --wbits 4 --load llama7b-4bit.pt --text "this is llama" --pre_layer 16
-It takes about 180 seconds to generate 45 tokens(5->50 tokens) on RTX3090 based on LLaMa-65B. pre_layer is set to 50.
+It takes about 180 seconds to generate 45 tokens(5->50 tokens) on single RTX3090 based on LLaMa-65B. pre_layer is set to 50.
 ```
 CUDA Kernels support 2,3,4,8 bits.
 
