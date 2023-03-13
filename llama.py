@@ -392,6 +392,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    if type(args.load) is not str:
+        args.load = args.load.as_posix()
+    
     if args.load:
         model = load_quant(args.model, args.load, args.wbits)
     else:
