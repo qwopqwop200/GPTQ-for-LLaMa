@@ -1,4 +1,4 @@
 safetensors==0.3.0
 datasets==2.10.1
 sentencepiece
-git+https://github.com/zphang/transformers@llama_push
+git+https://github.com/zphang/transformers@a3dfcc02d249cbd14ce9089f57d4040146f3f090
