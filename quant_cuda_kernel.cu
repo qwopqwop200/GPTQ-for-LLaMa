@@ -10,8 +10,8 @@ __global__ void VecQuant2MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  scalar_t* __restrict__ zeros,
-	int batch,
-	int vec_height, 	
+    int batch,
+    int vec_height, 	
     int height,
     int width
 );
@@ -23,8 +23,8 @@ __global__ void VecQuant3MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  scalar_t* __restrict__ zeros,
-	int batch,
-	int vec_height, 	
+    int batch,
+    int vec_height, 	
     int height,
     int width
 );
@@ -36,8 +36,8 @@ __global__ void VecQuant4MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  scalar_t* __restrict__ zeros,
-	int batch,
-	int vec_height, 	
+    int batch,
+    int vec_height, 	
     int height,
     int width
 );
@@ -49,8 +49,8 @@ __global__ void VecQuant8MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  scalar_t* __restrict__ zeros,
-	int batch,
-	int vec_height, 	
+    int batch,
+    int vec_height, 	
     int height,
     int width
 );
@@ -102,8 +102,8 @@ __global__ void VecQuant2MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  scalar_t* __restrict__ zeros,
-	int batch,
-	int vec_height,
+    int batch,
+    int vec_height,
     int height,
     int width
 ) {
@@ -298,8 +298,8 @@ __global__ void VecQuant4MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  scalar_t* __restrict__ zeros,
-	int batch,
-	int vec_height,
+    int batch,
+    int vec_height,
     int height,
     int width
 ) {
@@ -374,8 +374,8 @@ __global__ void VecQuant8MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  scalar_t* __restrict__ zeros,
-	int batch,
-	int vec_height,
+    int batch,
+    int vec_height,
     int height,
     int width
 ) {
