@@ -186,8 +186,8 @@ __global__ void VecQuant3MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  scalar_t* __restrict__ zeros,
-	int batch,
-	int vec_height,
+    int batch,
+    int vec_height,
     int height,
     int width
 ) {
