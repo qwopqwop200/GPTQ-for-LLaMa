@@ -1,3 +1,5 @@
+**Currently this code may not work.**
+
 # GPTQ-for-LLaMa
 4 bits quantization of [LLaMa](https://arxiv.org/abs/2302.13971) using [GPTQ](https://arxiv.org/abs/2210.17323)
 
