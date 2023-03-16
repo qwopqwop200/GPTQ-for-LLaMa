@@ -15,8 +15,8 @@ def get_llama(model):
     torch.nn.init.kaiming_uniform_ = skip
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
-    from transformers import LLaMAForCausalLM
-    model = LLaMAForCausalLM.from_pretrained(model, torch_dtype='auto')
+    from transformers import LlamaForCausalLM
+    model = LlamaForCausalLM.from_pretrained(model, torch_dtype='auto')
     model.seqlen = 2048
     return model
 
@@ -217,8 +217,8 @@ def llama_pack(model, quantizers, wbits):
     return model
 
 def load_quant(model, checkpoint, wbits):
-    from transformers import LLaMAConfig, LLaMAForCausalLM 
-    config = LLaMAConfig.from_pretrained(model)
+    from transformers import LlamaConfig, LlamaForCausalLM 
+    config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
         pass
     torch.nn.init.kaiming_uniform_ = noop 
@@ -228,7 +228,7 @@ def load_quant(model, checkpoint, wbits):
     torch.set_default_dtype(torch.half)
     transformers.modeling_utils._init_weights = False
     torch.set_default_dtype(torch.half)
-    model = LLaMAForCausalLM(config)
+    model = LlamaForCausalLM(config)
     torch.set_default_dtype(torch.float)
     model = model.eval()
     layers = find_layers(model)
