@@ -11,13 +11,13 @@ from transformers import AutoTokenizer
 
 DEV = torch.device('cuda:0')
 import copy 
-from transformers.models.llama.modeling_llama import LLaMAModel,LLaMAConfig
+from transformers.models.llama.modeling_llama import LlamaModel,LlamaConfig
 from transformers.modeling_outputs import BaseModelOutputWithPast
 from typing import List, Optional, Tuple, Union
 import time
 
-class Offload_LLaMAModel(LLaMAModel):
-    def __init__(self, config: LLaMAConfig):
+class Offload_LlamaModel(LlamaModel):
+    def __init__(self, config: LlamaConfig):
         super().__init__(config)
 
     def forward(
@@ -180,9 +180,9 @@ class Offload_LLaMAModel(LLaMAModel):
         )
 
 def load_quant(model, checkpoint, wbits, pre_layer):
-    transformers.models.llama.modeling_llama.LLaMAModel = Offload_LLaMAModel
-    from transformers import LLaMAConfig, LLaMAForCausalLM 
-    config = LLaMAConfig.from_pretrained(model)
+    transformers.models.llama.modeling_llama.LlamaModel = Offload_LlamaModel
+    from transformers import LlamaConfig, LlamaForCausalLM 
+    config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
         pass
     torch.nn.init.kaiming_uniform_ = noop 
@@ -192,7 +192,7 @@ def load_quant(model, checkpoint, wbits, pre_layer):
     torch.set_default_dtype(torch.half)
     transformers.modeling_utils._init_weights = False
     torch.set_default_dtype(torch.half)
-    model = LLaMAForCausalLM(config)
+    model = LlamaForCausalLM(config)
     torch.set_default_dtype(torch.float)
     model = model.eval()
     layers = find_layers(model)
