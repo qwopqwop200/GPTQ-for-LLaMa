@@ -1,5 +1,3 @@
-**Currently this code may not work.**
-
 # GPTQ-for-LLaMa
 4 bits quantization of [LLaMa](https://arxiv.org/abs/2302.13971) using [GPTQ](https://arxiv.org/abs/2210.17323)
 
@@ -71,9 +69,6 @@ CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --nearest
 # Run GPTQ and compute results
 CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --groupsize 64
 ````
-
-To run other LLaMa models replace `llama-7b-hf` with one of: `llama-13b-hf`, `llama-30b-hf`, `llama-65b-hf`.
-
 ## ZeroShot
 
 See `zeroShot/` folder.
