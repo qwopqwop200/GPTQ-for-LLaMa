@@ -53,7 +53,7 @@ pip install -r requirements.txt
 * `transformers`: tested on v4.28.0.dev0
 * `datasets`: tested on v2.10.1
 * `safetensors`: tested on v0.3.0
-* (to run 4-bit kernels: setup for compiling PyTorch CUDA extensions, see also https://pytorch.org/tutorials/advanced/cpp_extension.html, tested on CUDA 11.6)
+* (to run 4-bit kernels: setup for compiling PyTorch CUDA extensions, see also https://pytorch.org/tutorials/advanced/cpp_extension.html, tested on CUDA 11.7)
 
 All experiments were run on a single NVIDIA RTX3090.
 
