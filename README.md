@@ -61,6 +61,9 @@ All experiments were run on a single NVIDIA RTX3090.
 
 ### LLaMa
 ```
+#convert LLaMa to hf
+python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir /output/path
+
 # Compute full precision (FP16) results
 CUDA_VISIBLE_DEVICES=0 python llama.py decapoda-research/llama-7b-hf c4
 # Run RTN baseline and compute results
