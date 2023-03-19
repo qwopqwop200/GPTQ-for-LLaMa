@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 
 import quant_cuda
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -35,31 +37,31 @@ mul = mul.to(DTYPE)
 
 mat = torch.randint(-1000000000, 1000000000, (M // 256 * 32, N), device=DEV, dtype=torch.int)
 scales = torch.randn(N, device=DEV, dtype=DTYPE)
-zeros = torch.randn(N, device=DEV, dtype=DTYPE)
+zeros = torch.randint(-1000000000, 1000000000, (1, N // 256 * 32), device=DEV, dtype=torch.int)
 
 COUNT = 1000
 import time
 tick = time.time()
 for _ in range(COUNT):
-    quant_cuda.vecquant2matmul(vec, mat, mul, scales, zeros)
+    quant_cuda.vecquant2matmul(vec, mat, mul, scales, zeros, M)
     torch.cuda.synchronize()
 print('2bit:', (time.time() - tick) / COUNT)
 
 tick = time.time()
 for _ in range(COUNT):
-    quant_cuda.vecquant3matmul(vec, mat, mul, scales, zeros)
+    quant_cuda.vecquant3matmul(vec, mat, mul, scales, zeros, M)
     torch.cuda.synchronize()
 print('3bit:', (time.time() - tick) / COUNT)
 
 tick = time.time()
 for _ in range(COUNT):
-    quant_cuda.vecquant4matmul(vec, mat, mul, scales, zeros)
+    quant_cuda.vecquant4matmul(vec, mat, mul, scales, zeros, M)
     torch.cuda.synchronize()
 print('4bit:', (time.time() - tick) / COUNT)
 
 tick = time.time()
 for _ in range(COUNT):
-    quant_cuda.vecquant8matmul(vec, mat, mul, scales, zeros)
+    quant_cuda.vecquant8matmul(vec, mat, mul, scales, zeros, M)
     torch.cuda.synchronize()
 print('8bit:', (time.time() - tick) / COUNT)
 print('Verifiying kernel correctness ...')
@@ -79,19 +81,17 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = QuantLinear(2,layer.in_features, layer.out_features)
+qlayer = QuantLinear(2, -1, layer.in_features, layer.out_features)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
 layer = layer.to(DEV)
 
 with torch.no_grad():
-    print(layer.to(DEV)(vec).shape)
-    print(qlayer(vec).shape)
     print('2bit Simu:', qlayer(vec))
     print('2bit Kern:', layer.to(DEV)(vec))
     print('\n')
-    
+
 layer = nn.Linear(M, N)
 vec = torch.randn(B,L,M).to(DEV)
 
@@ -102,7 +102,7 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = QuantLinear(3,layer.in_features, layer.out_features)
+qlayer = QuantLinear(3, -1, layer.in_features, layer.out_features)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
@@ -112,7 +112,7 @@ with torch.no_grad():
     print('3bit Simu:', qlayer(vec))
     print('3bit Kern:', layer.to(DEV)(vec))
     print('\n')
-    
+
 layer = nn.Linear(M, N)
 vec = torch.randn(B,L,M).to(DEV)
 
@@ -123,11 +123,11 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = QuantLinear(4, layer.in_features, layer.out_features)
+qlayer = QuantLinear(4, -1, layer.in_features, layer.out_features)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
-layer = layer.to(DEV)
+layer = layer.to(DEV) 
 
 with torch.no_grad():
     print('4bit Simu:', qlayer(vec))
@@ -144,7 +144,7 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = QuantLinear(8, layer.in_features, layer.out_features)
+qlayer = QuantLinear(8, -1, layer.in_features, layer.out_features)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
