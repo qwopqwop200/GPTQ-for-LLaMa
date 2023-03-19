@@ -92,8 +92,8 @@ def llama_sequential(model, dataloader, dev):
         for name in subset:
             print(i, name)
             print('Quantizing ...')
-            gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize)
-            quantizers['model.layers.%d.%s' % (i, name)] = gptq[name].quantizer
+            scale,zero = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize)
+            quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero)
             gptq[name].free()
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
@@ -203,20 +203,21 @@ def llama_eval(model, testenc, dev):
     model.config.use_cache = use_cache
 
 # TODO: perform packing on GPU
-def llama_pack(model, quantizers, wbits):
+def llama_pack(model, quantizers, wbits, groupsize):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, wbits)
+    make_quant(model, quantizers, wbits, groupsize)
     qlayers = find_layers(model, [QuantLinear])
     print('Packing ...')
     for name in qlayers:
         print(name)
-        quantizers[name] = quantizers[name].cpu()
-        qlayers[name].pack(layers[name], quantizers[name].scale, quantizers[name].zero)
+        quantizers[name],scale,zero = quantizers[name]
+        quantizers[name],scale,zero = quantizers[name].cpu(),scale.cpu(),zero.cpu()
+        qlayers[name].pack(layers[name], scale, zero)
     print('Done.')
     return model
 
-def load_quant(model, checkpoint, wbits):
+def load_quant(model, checkpoint, wbits, groupsize):
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -235,7 +236,7 @@ def load_quant(model, checkpoint, wbits):
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    make_quant(model, layers, wbits)
+    make_quant(model, layers, wbits, groupsize)
 
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
@@ -396,7 +397,7 @@ if __name__ == '__main__':
         args.load = args.load.as_posix()
     
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits)
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
     else:
         model = get_llama(args.model)
         model.eval()
@@ -430,10 +431,10 @@ if __name__ == '__main__':
         llama_eval(model, testloader, DEV)
 
     if args.save:
-        llama_pack(model, quantizers, args.wbits)
+        llama_pack(model, quantizers, args.wbits, args.groupsize)
         torch.save(model.state_dict(), args.save) 
 
     if args.save_safetensors:
-        llama_pack(model, quantizers, args.wbits)
+        llama_pack(model, quantizers, args.wbits, args.groupsize)
         from safetensors.torch import save_file as safe_save
         safe_save(model.state_dict(), args.save_safetensors)
