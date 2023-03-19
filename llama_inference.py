@@ -23,7 +23,7 @@ def get_llama(model):
     model.seqlen = 2048
     return model
 
-def load_quant(model, checkpoint, wbits):
+def load_quant(model, checkpoint, wbits, groupsize):
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -42,7 +42,7 @@ def load_quant(model, checkpoint, wbits):
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    make_quant(model, layers, wbits)
+    make_quant(model, layers, wbits, groupsize)
 
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
