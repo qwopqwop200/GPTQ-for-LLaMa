@@ -4,54 +4,62 @@
 
 void vecquant2matmul_cuda(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-  torch::Tensor scales, torch::Tensor zeros
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize
 ); 
 
 void vecquant2matmul(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-  torch::Tensor scales, torch::Tensor zeros
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize
 ) {
   const at::cuda::OptionalCUDAGuard device_guard(device_of(vec));
-  vecquant2matmul_cuda(vec, mat, mul, scales, zeros);
+  vecquant2matmul_cuda(vec, mat, mul, scales, zeros,groupsize);
 }
 
 void vecquant3matmul_cuda(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-  torch::Tensor scales, torch::Tensor zeros
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize
 ); 
 
 void vecquant3matmul(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-  torch::Tensor scales, torch::Tensor zeros
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize
 ) {
   const at::cuda::OptionalCUDAGuard device_guard(device_of(vec));
-  vecquant3matmul_cuda(vec, mat, mul, scales, zeros);
+  vecquant3matmul_cuda(vec, mat, mul, scales, zeros, groupsize);
 }
 
 void vecquant4matmul_cuda(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-  torch::Tensor scales, torch::Tensor zeros
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize
 ); 
 
 void vecquant4matmul(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-  torch::Tensor scales, torch::Tensor zeros
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize
 ) {
   const at::cuda::OptionalCUDAGuard device_guard(device_of(vec));
-  vecquant4matmul_cuda(vec, mat, mul, scales, zeros);
+  vecquant4matmul_cuda(vec, mat, mul, scales, zeros, groupsize);
 }
 
 void vecquant8matmul_cuda(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-  torch::Tensor scales, torch::Tensor zeros
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize
 ); 
 
 void vecquant8matmul(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-  torch::Tensor scales, torch::Tensor zeros
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize
 ) {
   const at::cuda::OptionalCUDAGuard device_guard(device_of(vec));
-  vecquant8matmul_cuda(vec, mat, mul, scales, zeros);
+  vecquant8matmul_cuda(vec, mat, mul, scales, zeros, groupsize);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
