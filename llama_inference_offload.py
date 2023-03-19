@@ -228,10 +228,13 @@ if __name__ == '__main__':
         help='#bits to use for quantization'
     )
     parser.add_argument(
+        '--groupsize', type=int, default=-1,
+        help='Groupsize to use for quantization; default uses full row.'
+    )
+    parser.add_argument(
         '--load', type=str, default='',
         help='Load quantized model.'
     )
-
     parser.add_argument(
         '--text', type=str,
         help='input text'
