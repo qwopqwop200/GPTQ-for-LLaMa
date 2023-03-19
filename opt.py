@@ -421,7 +421,7 @@ if __name__ == '__main__':
         args.load = args.load.as_posix()
     
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits, args.groupsize))
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
     else:
         model = get_opt(args.model)
         model.eval()
