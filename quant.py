@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-
+import math
 
 def quantize(x, scale, zero, maxq):
     q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
@@ -126,25 +126,37 @@ except:
 
 # Assumes layer is perfectly divisible into 256 * 256 blocks
 class QuantLinear(nn.Module): 
-    def __init__(self, bits, infeatures, outfeatures):
+    def __init__(self, bits, groupsize, infeatures, outfeatures):
         super().__init__()
         if bits not in [2,3,4,8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+        self.infeatures = infeatures
+        self.outfeatures = outfeatures
         self.bits = bits
-        self.register_buffer('zeros', torch.zeros((outfeatures, 1)))
-        self.register_buffer('scales', torch.zeros((outfeatures, 1)))
+        if groupsize != -1 and groupsize < 32 and groupsize != int(math.pow(2,int(math.log2(groupsize)))):
+            raise NotImplementedError("groupsize supports powers of 2 greater than 32. (e.g. : 32,64,128,etc)")
+        groupsize = groupsize if groupsize != -1 else infeatures
+        self.groupsize = groupsize
+        self.register_buffer('qzeros', torch.zeros((math.ceil(infeatures/groupsize),outfeatures // 256 * (bits * 8)), dtype=torch.int))
+        self.register_buffer('scales', torch.zeros((math.ceil(infeatures/groupsize),outfeatures)))
         self.register_buffer('bias', torch.zeros(outfeatures))
         self.register_buffer(
             'qweight', torch.zeros((infeatures // 256 * (bits * 8), outfeatures), dtype=torch.int)
         )
 
     def pack(self, linear, scales, zeros):
-        self.zeros = zeros * scales
+        scales = scales.t().contiguous()
+        zeros = zeros.t().contiguous()
+        scale_zeros = zeros * scales
         self.scales = scales.clone()
         if linear.bias is not None:
-            self.bias = linear.bias.clone()  
-
-        intweight = torch.round((linear.weight.data + self.zeros) / self.scales).to(torch.int)
+            self.bias = linear.bias.clone() 
+            
+        intweight = []
+        for idx in range(self.infeatures):
+            g_idx = idx // self.groupsize
+            intweight.append(torch.round((linear.weight.data[:,idx] + scale_zeros[g_idx]) / self.scales[g_idx]).to(torch.int)[:,None])
+        intweight = torch.cat(intweight,dim=1)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
         qweight = np.zeros(
@@ -182,6 +194,42 @@ class QuantLinear(nn.Module):
                 
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight) 
+        
+        zeros -= 1;
+        zeros = zeros.numpy().astype(np.uint32)
+        qzeros = np.zeros((zeros.shape[0], zeros.shape[1] // 256 * (self.bits * 8)), dtype=np.uint32)
+        i = 0
+        col = 0
+        while col < qzeros.shape[1]:
+            if self.bits in [2,4,8]:
+                for j in range(i, i + (32//self.bits)):
+                    qzeros[:, col] |= zeros[:, j] << (self.bits * (j - i))
+                i += 32//self.bits
+                col += 1
+            elif self.bits == 3:
+                for j in range(i, i + 10):
+                    qzeros[:, col] |= zeros[:, j] << (3 * (j - i))
+                i += 10
+                qzeros[:, col] |= zeros[:, i] << 30
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 2) & 1
+                i += 1
+                for j in range(i, i + 10):
+                    qzeros[:, col] |= zeros[:, j] << (3 * (j - i) + 1)
+                i += 10
+                qzeros[:, col] |= zeros[:, i] << 31
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 1) & 0x3
+                i += 1
+                for j in range(i, i + 10):
+                    qzeros[:, col] |= zeros[:, j] << (3 * (j - i) + 2)
+                i += 10
+                col += 1
+            else:
+                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+                
+        qzeros = qzeros.astype(np.int32)
+        self.qzeros = torch.from_numpy(qzeros) 
 
     def forward(self, x):
         outshape = list(x.shape)
@@ -191,19 +239,19 @@ class QuantLinear(nn.Module):
         dtype = x.dtype
         x = x.float()
         if self.bits == 2:
-            quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.zeros)
+            quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
         elif self.bits == 3:
-            quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.zeros)
+            quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
         elif self.bits == 4:
-            quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.zeros)
+            quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
         elif self.bits == 8:
-            quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.zeros)
+            quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
         else:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         y = y.to(dtype)
         return y.reshape(outshape)
 
-def make_quant(module, names, bits, name=''):
+def make_quant(module, names, bits, groupsize, name=''):
     if isinstance(module, QuantLinear):
         return
     for attr in dir(module):
@@ -211,7 +259,7 @@ def make_quant(module, names, bits, name=''):
         name1 = name + '.' + attr if name != '' else attr
         if name1 in names:
             setattr(
-                module, attr, QuantLinear(bits, tmp.in_features, tmp.out_features)
+                module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features)
             )
     for name1, child in module.named_children():
-        make_quant(child, names, bits, name + '.' + name1 if name != '' else name1)
+        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
