@@ -84,26 +84,23 @@ CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 # Benchmark language generation with 4-bit LLaMa-7B:
 
 # Save compressed model
-CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --save llama7b-4bit.pt
+CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --groupsize 128 --save llama7b-4bit.pt
 # Or save compressed `.safetensors` model
-CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --save_safetensors llama7b-4bit.safetensors
+CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --groupsize 128 --save_safetensors llama7b-4bit.safetensors
 # Benchmark generating a 2048 token sequence with the saved model
-CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --load llama7b-4bit.pt --benchmark 2048 --check
+CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --groupsize 128 --load llama7b-4bit.pt --benchmark 2048 --check
 # Benchmark FP16 baseline, note that the model will be split across all listed GPUs
 CUDA_VISIBLE_DEVICES=0,1,2,3,4 python llama.py /output/path c4 --benchmark 2048 --check
 
 # model inference with the saved model
-CUDA_VISIBLE_DEVICES=0 python llama_inference.py /output/path --wbits 4 --load llama7b-4bit.pt --text "this is llama"
+CUDA_VISIBLE_DEVICES=0 python llama_inference.py /output/path --wbits 4 --groupsize 128 --load llama7b-4bit.pt --text "this is llama"
 # model inference with the saved model with offload(This is very slow. This is a simple implementation and could be improved with technologies like flexgen(https://github.com/FMInference/FlexGen).
-CUDA_VISIBLE_DEVICES=0 python llama_inference_offload.py /output/path --wbits 4 --load llama7b-4bit.pt --text "this is llama" --pre_layer 16
+CUDA_VISIBLE_DEVICES=0 python llama_inference_offload.py /output/path --wbits 4 --groupsize 128 --load llama7b-4bit.pt --text "this is llama" --pre_layer 16
 It takes about 180 seconds to generate 45 tokens(5->50 tokens) on single RTX3090 based on LLaMa-65B. pre_layer is set to 50.
 ```
 CUDA Kernels support 2,3,4,8 bits.
 
 Basically, 4-bit quantization is recommended.
-
-cuda kernel does not support group size.
-
 ## Memory Usage
 |                           Model                                                             | Bits | memory(MiB) | benchmark(ppl) | Wikitext2 |   PTB     |    C4   | checkpoint size(GB) |
 | ------------------------------------------------------------------------------------------- | ---- | ----------- | ------------- | --------- | --------- | ------- | ------------------- |
