@@ -49,6 +49,14 @@ GPTQ is SOTA one-shot weight quantization method
 
 </details>
 
+<details>
+<summary>LLaMa-65B</summary>
+
+| [LLaMa-65B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
+| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
+| FP16                                               |  16  |     -      |     OOM     |    3.53   |   6.90  |   5.61  |         121.0        |
+</details>
+
 Quantization requires a large amount of CPU memory. However, the memory required can be reduced by using swap memory.
 
 Depending on the GPUs/drivers, there may be a difference in performance, which decreases as the model size increases.(https://github.com/IST-DASLab/gptq/issues/1)
