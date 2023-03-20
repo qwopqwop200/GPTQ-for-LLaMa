@@ -14,8 +14,8 @@ __global__ void VecQuant2MatMulKernel(
     int vec_height, 	
     int height,
     int width,
-	int zero_width,
-	int groupsize
+    int zero_width,
+    int groupsize
 );
 
 template <typename scalar_t>
@@ -29,8 +29,8 @@ __global__ void VecQuant3MatMulKernel(
     int vec_height, 	
     int height,
     int width,
-	int zero_width,
-	int groupsize
+    int zero_width,
+    int groupsize
 );
 
 template <typename scalar_t>
@@ -44,8 +44,8 @@ __global__ void VecQuant4MatMulKernel(
     int vec_height, 	
     int height,
     int width,
-	int zero_width,
-	int groupsize
+    int zero_width,
+    int groupsize
 );
 
 template <typename scalar_t>
@@ -59,8 +59,8 @@ __global__ void VecQuant8MatMulKernel(
     int vec_height, 	
     int height,
     int width,
-	int zero_width,
-	int groupsize
+    int zero_width,
+    int groupsize
 );
 
 const int BLOCKWIDTH  = 256;
@@ -116,7 +116,7 @@ __global__ void VecQuant2MatMulKernel(
     int vec_height,
     int height,
     int width,
-	int zero_width,
+    int zero_width,
     int groupsize
 ) {
   int b = blockIdx.z;
@@ -140,9 +140,9 @@ __global__ void VecQuant2MatMulKernel(
   while (k < BLOCKWIDTH) {
     tmp = as_unsigned(mat[i]);
 	
-	int g = (g_h + k) / groupsize;
-	scalar_t scale = scales[g * width + w];
-	scalar_t zero = scale * scalar_t((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod & 0x3) + 1);
+    int g = (g_h + k) / groupsize;
+    scalar_t scale = scales[g * width + w];
+    scalar_t zero = scale * scalar_t((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod & 0x3) + 1);
 	
     res += (scale * scalar_t((tmp >> 0) & 0x3) - zero) * blockvec[k + 0];
     res += (scale * scalar_t((tmp >> 2) & 0x3) - zero) * blockvec[k + 1];
@@ -211,7 +211,7 @@ __global__ void VecQuant3MatMulKernel(
     int vec_height,
     int height,
     int width,
-	int zero_width,
+    int zero_width,
     int groupsize
 ) {
   int b = blockIdx.z;
@@ -260,18 +260,18 @@ __global__ void VecQuant3MatMulKernel(
   while (k < BLOCKWIDTH) {
     tmp1 = as_unsigned(mat[i]);
 	
-	int g = (g_h + k) / groupsize;
-	scalar_t scale = scales[g * width + w];
-	scalar_t zero;
-	if (z_mod == 10) {
-	  z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 30) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 2) & 0x4);
-	  zero = scale * scalar_t((z_tmp) + 1);
-	} else if (z_mod == 21){
-	  z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 31) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 1) & 0x6);
+    int g = (g_h + k) / groupsize;
+    scalar_t scale = scales[g * width + w];
+    scalar_t zero;
+    if (z_mod == 10) {
+      z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 30) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 2) & 0x4);
       zero = scale * scalar_t((z_tmp) + 1);
-	} else {
-	  zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1);
-	}
+    } else if (z_mod == 21){
+      z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 31) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 1) & 0x6);
+      zero = scale * scalar_t((z_tmp) + 1);
+    } else {
+      zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1);
+    }
 	
     res += (scale * scalar_t((tmp1 >>  0) & 0x7) - zero) * blockvec[k + 0];
     res += (scale * scalar_t((tmp1 >>  3) & 0x7) - zero) * blockvec[k + 1];
@@ -281,10 +281,10 @@ __global__ void VecQuant3MatMulKernel(
     res += (scale * scalar_t((tmp1 >> 15) & 0x7) - zero) * blockvec[k + 5];
     res += (scale * scalar_t((tmp1 >> 18) & 0x7) - zero) * blockvec[k + 6];
     res += (scale * scalar_t((tmp1 >> 21) & 0x7) - zero) * blockvec[k + 7];
-	res += (scale * scalar_t((tmp1 >> 24) & 0x7) - zero) * blockvec[k + 8];
+    res += (scale * scalar_t((tmp1 >> 24) & 0x7) - zero) * blockvec[k + 8];
     res += (scale * scalar_t((tmp1 >> 27) & 0x7) - zero) * blockvec[k + 9];
 	
-	i += width;
+    i += width;
     tmp2 = as_unsigned(mat[i]);
     tmp = (tmp1 >> 30) | ((tmp2 << 2) & 0x4);
     tmp2 >>= 1;
@@ -370,8 +370,8 @@ __global__ void VecQuant4MatMulKernel(
     int vec_height,
     int height,
     int width,
-	int zero_width,
-	int groupsize
+    int zero_width,
+    int groupsize
 ) {
   int b = blockIdx.z;
   int h = BLOCKHEIGHT4 * blockIdx.x;
@@ -392,15 +392,15 @@ __global__ void VecQuant4MatMulKernel(
   unsigned int tmp;
 
   while (k < BLOCKWIDTH) {
-	tmp = as_unsigned(mat[i]);
+    tmp = as_unsigned(mat[i]);
 	
-	int g = (g_h + k) / groupsize;
-	scalar_t scale = scales[g * width + w];
-	scalar_t zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1);
+    int g = (g_h + k) / groupsize;
+    scalar_t scale = scales[g * width + w];
+    scalar_t zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1);
 	
     res += (scale * scalar_t((tmp >> 0) & 0xF) - zero) * blockvec[k + 0];
     res += (scale * scalar_t((tmp >> 4) & 0xF) - zero) * blockvec[k + 1];
-	res += (scale * scalar_t((tmp >> 8) & 0xF) - zero) * blockvec[k + 2];
+    res += (scale * scalar_t((tmp >> 8) & 0xF) - zero) * blockvec[k + 2];
     res += (scale * scalar_t((tmp >> 12) & 0xF) - zero) * blockvec[k + 3];
     res += (scale * scalar_t((tmp >> 16) & 0xF) - zero) * blockvec[k + 4];
     res += (scale * scalar_t((tmp >> 20) & 0xF) - zero) * blockvec[k + 5];
@@ -481,9 +481,9 @@ __global__ void VecQuant8MatMulKernel(
   while (k < BLOCKWIDTH) { 
     tmp = as_unsigned(mat[i]);
 	
-	int g = (g_h + k) / groupsize;
-	scalar_t scale = scales[g * width + w];
-	scalar_t zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xFF) + 1);
+    int g = (g_h + k) / groupsize;
+    scalar_t scale = scales[g * width + w];
+    scalar_t zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xFF) + 1);
 	
     res += (scale * scalar_t((tmp >> 0) & 0xFF) - zero) * blockvec[k + 0];
     res += (scale * scalar_t((tmp >> 8) & 0xFF) - zero) * blockvec[k + 1];
