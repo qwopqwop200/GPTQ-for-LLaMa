@@ -247,9 +247,9 @@ __global__ void VecQuant3MatMulKernel(
       } else {
         z_bit *= 3;
       }
-	} else {
+    } else {
       z_w += 1;
-	}
+    }
   }
  
   unsigned int tmp1;
