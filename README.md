@@ -12,7 +12,6 @@ GPTQ is SOTA one-shot weight quantization method
 | [LLaMa-7B](https://arxiv.org/abs/2302.13971)       | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
 | FP16                                               |  16  |     -      |    13940    |    5.67   |   8.79  |   7.05  |         12.5        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  8   |     -      |     7748    |    5.67   |   8.81  |   7.08  |          6.5        |
 | RTN                                                |  4   |     -      |      -      |    6.28   |   9.68  |   7.70  |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     4740    |    6.79   |  10.67  |   8.28  |          3.5        |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     4891    |    6.26   |   9.71  |   7.60  |          3.7        | 
@@ -28,7 +27,6 @@ GPTQ is SOTA one-shot weight quantization method
 | [LLaMa-13B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
 | FP16                                               |  16  |     -      |     OOM     |    5.08   |   8.06  |   6.58  |         24.2        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  8   |     -      |    14570    |    5.09   |   8.06  |   6.61  |         12.4        |
 | RTN                                                |  4   |     -      |      -      |    5.52   |   8.62  |   6.96  |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     8410    |    5.35   |   8.40  |   6.82  |          6.5        |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     8747    |    5.21   |   8.20  |   7.60  |          -          | 
@@ -44,8 +42,9 @@ GPTQ is SOTA one-shot weight quantization method
 | [LLaMa-33B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
 | FP16                                               |  16  |     -      |     OOM     |    4.10   |   7.29  |   5.97  |         60.5        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |    19499    |    4.45   |   7.58  |   6.22  |         17.0        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |    15499    |    5.78   |   8.98  |   7.38  |         13.0        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |    19499    |    4.45   |   7.58  |   6.22  |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |    20570    |    4.22   |   7.38  |   6.06  |         16.8        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |    15499    |    5.78   |   8.98  |   7.38  |          -          |
 
 </details>
 
