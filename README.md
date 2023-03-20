@@ -39,7 +39,7 @@ GPTQ is SOTA one-shot weight quantization method
 </details>
 
 <details>
-<summary>LLaMa-13B</summary>
+<summary>LLaMa-33B</summary>
 
 | [LLaMa-33B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
