@@ -69,9 +69,6 @@ CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --nearest
 # Run GPTQ and compute results
 CUDA_VISIBLE_DEVICES=0 python llama.py /output/path c4 --wbits 4 --groupsize 64
 ````
-## ZeroShot
-
-See `zeroShot/` folder.
 
 ## CUDA Kernels 
 ```
