@@ -24,7 +24,7 @@ def main():
             model_size=args.model_size,
         )
     write_tokenizer(
-        tokenizer_path=os.path.join(args.output_dir, "tokenizer"),
+        tokenizer_path=os.path.join(args.output_dir, "llama-{}".format(args.model_size).lower()),
         input_tokenizer_path=os.path.join(args.input_dir, "tokenizer.model"),
     )
 
