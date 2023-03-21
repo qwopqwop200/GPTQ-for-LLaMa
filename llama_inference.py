@@ -109,7 +109,7 @@ if __name__ == '__main__':
         args.load = args.load.as_posix()
     
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits)
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
     else:
         model = get_llama(args.model)
         model.eval()
