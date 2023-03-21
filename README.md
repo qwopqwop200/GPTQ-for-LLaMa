@@ -32,7 +32,7 @@ GPTQ is SOTA one-shot weight quantization method
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     8747    |    5.21   |   8.20  |   6.70  |          -          | 
 | RTN                                                |  3   |     -      |      -      |   25.66   |  61.25  |  28.19  |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     6870    |    6.77   |  10.29  |   8.34  |          5.1        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     7277    |    5.66   |   8.74  |    -    |          5.4        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     7277    |    5.66   |   8.74  |   7.16  |          5.4        |
 
 </details>
 
