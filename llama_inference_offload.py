@@ -181,7 +181,8 @@ class Offload_LlamaModel(LlamaModel):
             attentions=all_self_attns,
         )
 
-def load_quant(model, checkpoint, wbits, groupsize):
+def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
+    transformers.models.llama.modeling_llama.LlamaModel = Offload_LlamaModel
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -209,8 +210,14 @@ def load_quant(model, checkpoint, wbits, groupsize):
     else:
         model.load_state_dict(torch.load(checkpoint))
     model.seqlen = 2048
+    
+    for i in range(pre_layer):
+        model.model.layers[i].to(DEV)
+    model.model.embed_tokens.to(DEV)
+    model.model.norm.to(DEV)
+    model.lm_head.to(DEV)
+    model.model.preload = pre_layer
     print('Done.')
-
     return model
 
 if __name__ == '__main__':
@@ -270,7 +277,7 @@ if __name__ == '__main__':
     if type(args.load) is not str:
         args.load = args.load.as_posix()
     
-    model = load_quant(args.model, args.load, args.wbits, args.pre_layer)
+    model = load_quant(args.model, args.load, args.wbits, args.groupsize, args.pre_layer)
         
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     input_ids = tokenizer.encode(args.text, return_tensors="pt").to(DEV)
