@@ -44,7 +44,7 @@ GPTQ is SOTA one-shot weight quantization method
 | FP16                                               |  16  |     -      |     OOM     |    4.10   |   7.29  |   5.97  |         60.5        |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |    19499    |    4.45   |   7.55  |   6.22  |         15.7        |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |    20570    |    4.22   |   7.38  |   6.06  |         16.8        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |    15499    |    5.88   |   8.96  |   7.38  |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |    15499    |    5.88   |   8.96  |   7.41  |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |    16566    |    4.84   |   7.83  |   6.49  |         13.0        |
 
 </details>
@@ -54,7 +54,7 @@ GPTQ is SOTA one-shot weight quantization method
 
 | [LLaMa-65B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
-| FP16                                               |  16  |     -      |     OOM     |    3.53   |   6.90  |   5.61  |         121.0        |
+| FP16                                               |  16  |     -      |     OOM     |    3.53   |   6.90  |   5.61  |         121.0       |
 </details>
 
 Quantization requires a large amount of CPU memory. However, the memory required can be reduced by using swap memory.
