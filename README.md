@@ -116,7 +116,7 @@ It takes about 180 seconds to generate 45 tokens(5->50 tokens) on single RTX3090
 ```
 CUDA Kernels support 2,3,4,8 bits.
 
-Basically, 4-bit quantization is recommended.
+Basically, 4-bit quantization and 128 groupsize are recommended.
 
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
