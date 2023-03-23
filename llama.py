@@ -68,33 +68,46 @@ def llama_sequential(model, dataloader, dev):
     quantizers = {}
     for i in range(len(layers)):
         layer = layers[i].to(dev)
-        subset = find_layers(layer)
-        gptq = {}
-        for name in subset:
-            gptq[name] = GPTQ(subset[name])
-            gptq[name].quantizer = Quantizer()
-            gptq[name].quantizer.configure(
-                args.wbits, perchannel=True, sym=False, mse=False
-            )
+        full = find_layers(layer)
+        if args.true_sequential:
+            sequential = [
+                ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
+                ['self_attn.o_proj'],
+                ['mlp.up_proj', 'mlp.gate_proj'],
+                ['mlp.down_proj']
+            ]
+        else:
+            sequential = [list(full.keys())]
+       
+        for names in sequential:
+            subset = {n: full[n] for n in names}
+            gptq = {}
+            for name in subset:
+                gptq[name] = GPTQ(subset[name])
+                gptq[name].quantizer = Quantizer()
+                gptq[name].quantizer.configure(
+                    args.wbits, perchannel=True, sym=args.sym, mse=False
+                )
+                
+            def add_batch(name):
+                def tmp(_, inp, out):
+                    gptq[name].add_batch(inp[0].data, out.data)
+                return tmp
+            handles = []
+            for name in subset:
+                handles.append(subset[name].register_forward_hook(add_batch(name)))
+            for j in range(args.nsamples):
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
+            for h in handles:
+                h.remove()
 
-        def add_batch(name):
-            def tmp(_, inp, out):
-                gptq[name].add_batch(inp[0].data, out.data)
-            return tmp
-        handles = []
-        for name in subset:
-            handles.append(subset[name].register_forward_hook(add_batch(name)))
-        for j in range(args.nsamples):
-            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
-        for h in handles:
-            h.remove()
-
-        for name in subset:
-            print(i, name)
-            print('Quantizing ...')
-            scale,zero = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize)
-            quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero)
-            gptq[name].free()
+            for name in subset:
+                print(i, name)
+                print('Quantizing ...')
+                scale,zero = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+                quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero)
+                gptq[name].free()
+                
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
 
@@ -392,6 +405,20 @@ if __name__ == '__main__':
         '--check', action='store_true',
         help='Whether to compute perplexity during benchmarking for verification.'
     )
+    parser.add_argument(
+        '--sym', action='store_true',
+        help='Whether to perform symmetric quantization.'
+    )
+    parser.add_argument(
+        '--act-order', action='store_true',
+        help='Whether to apply the activation order GPTQ heuristic'
+    )
+    parser.add_argument(
+        '--true-sequential', action='store_true',
+        help='Whether to run in true sequential model.'
+    )
+
+    
 
     args = parser.parse_args()
 
