@@ -258,6 +258,7 @@ def make_quant(module, names, bits, groupsize, name=''):
         tmp = getattr(module, attr)
         name1 = name + '.' + attr if name != '' else attr
         if name1 in names:
+            delattr(module, attr)
             setattr(
                 module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features)
             )
