@@ -238,6 +238,8 @@ def load_quant(model, checkpoint, wbits, groupsize):
             del layers[name]
     make_quant(model, layers, wbits, groupsize)
 
+    del layers
+    
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
         from safetensors.torch import load_file as safe_load
