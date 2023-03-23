@@ -58,7 +58,11 @@ GPTQ is SOTA one-shot weight quantization method
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
 | FP16                                               |  16  |     -      |     OOM     |    3.53   |   6.90  |   5.61  |         121.0       |
 | RTN                                                |  4   |     -      |      -      |    3.92   |   7.22  |   5.86  |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     OOM     |     -     |    -    |    -    |         31.1        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     OOM     |     -     |    -    |    -    |         33.2        |
 | RTN                                                |  3   |     -      |      -      |   10.59   |  20.79  |  12.76  |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     OOM     |     -     |    -    |    -    |         23.6        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     OOM     |     -     |    -    |    -    |         25.6        |
 </details>
 
 Quantization requires a large amount of CPU memory. However, the memory required can be reduced by using swap memory.
