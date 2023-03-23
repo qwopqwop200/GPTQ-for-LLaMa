@@ -5,6 +5,10 @@ GPTQ is SOTA one-shot weight quantization method
 
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
 
+**New Features**
+
+Changed to support a new trick proposed by [GPTQ](https://github.com/IST-DASLab/gptq).
+
 ## Result
 <details>
 <summary>LLaMa-7B(click me)</summary>
