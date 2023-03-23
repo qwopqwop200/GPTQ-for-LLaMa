@@ -260,6 +260,8 @@ def load_quant(model, checkpoint, wbits, groupsize):
         if name in layers:
             del layers[name]
     make_quant(model, layers, wbits, groupsize)
+    
+    del layers
 
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
