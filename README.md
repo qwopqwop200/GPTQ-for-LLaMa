@@ -5,68 +5,64 @@ GPTQ is SOTA one-shot weight quantization method
 
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
 
-**New Features**
+## New Features
 
-Changed to support a new trick proposed by [GPTQ](https://github.com/IST-DASLab/gptq).
+Changed to support a new trick proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
 
 ## Result
 <details>
 <summary>LLaMa-7B(click me)</summary>
 
-| [LLaMa-7B](https://arxiv.org/abs/2302.13971)       | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
-| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
-| FP16                                               |  16  |     -      |    13940    |    5.67   |   8.79  |   7.05  |         12.5        |
-| RTN                                                |  4   |     -      |      -      |    6.28   |   9.68  |   7.70  |          -          |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     4740    |    6.79   |  10.67  |   8.28  |          3.5        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     4891    |    6.26   |   9.71  |   7.60  |          3.7        | 
-| RTN                                                |  3   |     -      |      -      |   25.66   |  61.25  |  28.19  |          -          |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     3852    |   20.86   |  37.54  |  22.19  |          2.7        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     4116    |   10.60   |  14.74  |  10.39  |          3.0        |
+| [LLaMa-7B](https://arxiv.org/abs/2302.13971)       | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
+| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
+| FP16                                               |  16  |     -      |    13940    |    5.68   |         12.5        |
+| RTN                                                |  4   |     -      |      -      |    6.29   |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     4740    |    6.09   |          3.5        |
+| RTN                                                |  3   |     -      |      -      |   25.54   |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     3852    |    8.07   |          2.7        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     4116    |    6.61   |          3.0        |
 
 </details>
 
 <details>
 <summary>LLaMa-13B</summary>
 
-| [LLaMa-13B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
-| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
-| FP16                                               |  16  |     -      |     OOM     |    5.08   |   8.06  |   6.58  |         24.2        |
-| RTN                                                |  4   |     -      |      -      |    5.52   |   8.62  |   6.96  |          -          |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     8410    |    5.35   |   8.40  |   6.82  |          6.5        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     8747    |    5.21   |   8.20  |   6.70  |          6.9        | 
-| RTN                                                |  3   |     -      |      -      |   25.66   |  61.25  |  28.19  |          -          |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     6870    |    6.77   |  10.29  |   8.34  |          5.1        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     7277    |    5.66   |   8.74  |   7.16  |          5.4        |
+| [LLaMa-13B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
+| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
+| FP16                                               |  16  |     -      |     OOM     |    5.09   |         24.2        |
+| RTN                                                |  4   |     -      |      -      |    5.53   |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     8410    |    5.36   |          6.5        |
+| RTN                                                |  3   |     -      |      -      |   11.40   |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     6870    |    6.63   |          5.1        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     7277    |    5.62   |          5.4        |
 
 </details>
 
 <details>
 <summary>LLaMa-33B</summary>
 
-| [LLaMa-33B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
-| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
-| FP16                                               |  16  |     -      |     OOM     |    4.10   |   7.29  |   5.97  |         60.5        |
-| RTN                                                |  4   |     -      |      -      |    4.53   |   7.69  |   6.32  |          -          |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |    19493    |    4.45   |   7.55  |   6.22  |         15.7        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |    20570    |    4.22   |   7.38  |   6.06  |         16.8        |
-| RTN                                                |  3   |     -      |      -      |   14.89   |  30.96  |  28.58  |          -          |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |    15493    |    5.88   |   8.96  |   7.41  |         12.0        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |    16566    |    4.84   |   7.83  |   6.49  |         13.0        |
+| [LLaMa-33B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
+| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
+| FP16                                               |  16  |     -      |     OOM     |    4.10   |         60.5        |
+| RTN                                                |  4   |     -      |      -      |    4.54   |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |    19493    |    4.45   |         15.7        |
+| RTN                                                |  3   |     -      |      -      |   14.89   |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |    15493    |    5.69   |         12.0        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |    16566    |    4.80   |         13.0        |
 
 </details>
 
 <details>
 <summary>LLaMa-65B</summary>
 
-| [LLaMa-65B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 |   PTB   |    C4   | checkpoint size(GB) |
-| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------- | ------- | ------------------- |
-| FP16                                               |  16  |     -      |     OOM     |    3.53   |   6.90  |   5.61  |         121.0       |
-| RTN                                                |  4   |     -      |      -      |    3.92   |   7.22  |   5.86  |          -          |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     OOM     |     -     |    -    |    -    |         31.1        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     OOM     |     -     |    -    |    -    |         33.2        |
-| RTN                                                |  3   |     -      |      -      |   10.59   |  20.79  |  12.76  |          -          |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     OOM     |     -     |    -    |    -    |         23.6        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     OOM     |     -     |    -    |    -    |         25.6        |
+| [LLaMa-65B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
+| -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
+| FP16                                               |  16  |     -      |     OOM     |    3.53   |         121.0       |
+| RTN                                                |  4   |     -      |      -      |    3.92   |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     OOM     |    3.84   |         31.1        |
+| RTN                                                |  3   |     -      |      -      |   10.59   |          -          |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     OOM     |    5.04   |         23.6        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     OOM     |    4.17   |         25.6        |
 </details>
 
 Quantization requires a large amount of CPU memory. However, the memory required can be reduced by using swap memory.
