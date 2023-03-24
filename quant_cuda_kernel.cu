@@ -35,7 +35,7 @@ __global__ void VecQuant2MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  		int* __restrict__ zeros,
+    const  	int* __restrict__ zeros,
     int batch,
     int vec_height, 	
     int height,
