@@ -9,6 +9,8 @@ GPTQ is SOTA one-shot weight quantization method
 
 Changed to support a new trick proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
 
+**Currently, `groupsize` and `act-order` do not work together and you must choose one of them.**
+
 ## Result
 <details>
 <summary>LLaMa-7B(click me)</summary>
