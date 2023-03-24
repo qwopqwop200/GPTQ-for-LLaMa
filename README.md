@@ -6,10 +6,14 @@ GPTQ is SOTA one-shot weight quantization method
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
 
 ## New Features
+Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
 
-Changed to support a new trick proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
+* Slightly adjusted preprocessing of C4 and PTB for more realistic evaluations (used in our updated results); can be activated via the flag --new-eval.
+* two new tricks:--act-order (quantizing columns in order of decreasing activation size) and --true-sequential (performing sequential quantization even within a single Transformer block). Those fix GPTQ's strangely bad performance on the 7B model (from 7.15 to 6.09 Wiki2 PPL) and lead to slight improvements on most models/settings in general. 
 
 **Currently, `groupsize` and `act-order` do not work together and you must choose one of them.**
+
+* We will release a [fast cuda kernel](https://github.com/IST-DASLab/gptq/blob/main/quant_cuda_kernel.cu#L167) as soon as possible.
 
 ## Result
 <details>
