@@ -143,6 +143,7 @@ class QuantLinear(nn.Module):
         self.register_buffer(
             'qweight', torch.zeros((infeatures // 256 * (bits * 8), outfeatures), dtype=torch.int)
         )
+        self._initialized_quant_state = False
 
     def pack(self, linear, scales, zeros):
         scales = scales.t().contiguous()
@@ -232,12 +233,26 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros) 
 
     def forward(self, x):
+        intermediate_dtype = torch.float32
+
+        if not self._initialized_quant_state:
+            # Do we even have a bias? Check for at least one non-zero element.
+            if self.bias is not None and bool(torch.any(self.bias != 0)):
+                # Then make sure it's the right type.
+                self.bias.data = self.bias.data.to(intermediate_dtype)
+            else:
+                self.bias = None
+
         outshape = list(x.shape)
+        outshape[-1] = self.outfeatures
         x = x.reshape(-1, x.shape[-1])
-        y = self.bias.clone().repeat(x.shape[0],1)
-        outshape[-1] = self.bias.numel()
-        dtype = x.dtype
-        x = x.float()
+        if self.bias is None:
+            y = torch.zeros(x.shape[0], outshape[-1], dtype=intermediate_dtype, device=x.device)
+        else:
+            y = self.bias.clone().repeat(x.shape[0], 1)
+
+        output_dtype = x.dtype
+        x = x.to(intermediate_dtype)
         if self.bits == 2:
             quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
         elif self.bits == 3:
@@ -248,7 +263,7 @@ class QuantLinear(nn.Module):
             quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
         else:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-        y = y.to(dtype)
+        y = y.to(output_dtype)
         return y.reshape(outshape)
 
 def make_quant(module, names, bits, groupsize, name=''):
