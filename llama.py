@@ -382,6 +382,10 @@ if __name__ == '__main__':
         help='#bits to use for quantization; use 16 for evaluating base model.'
     )
     parser.add_argument(
+        '--trits', action='store_true',
+        help='Whether to use trits for quantization.'
+    )
+    parser.add_argument(
         '--groupsize', type=int, default=-1,
         help='Groupsize to use for quantization; default uses full row.'
     )
@@ -417,7 +421,10 @@ if __name__ == '__main__':
         '--true-sequential', action='store_true',
         help='Whether to run in true sequential model.'
     )
-
+    parser.add_argument(
+        '--new-eval', action='store_true',
+        help='Whether to use the new PTB and C4 eval'
+    )
     
 
     args = parser.parse_args()
@@ -452,7 +459,10 @@ if __name__ == '__main__':
     if args.load:
         exit()
 
-    for dataset in ['wikitext2', 'ptb', 'c4']:
+    datasets = ['wikitext2', 'ptb', 'c4'] 
+    if args.new_eval:
+      datasets = ['wikitext2', 'ptb-new', 'c4-new']
+    for dataset in datasets: 
         dataloader, testloader = get_loaders(
             dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
         )
