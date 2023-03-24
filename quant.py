@@ -4,6 +4,8 @@ import torch.nn as nn
 import math
 
 def quantize(x, scale, zero, maxq):
+    if maxq < 0:
+        return (x > scale / 2).float() * scale + (x < zero / 2).float() * zero
     q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
     return scale * (q - zero)
 
@@ -16,10 +18,12 @@ class Quantizer(nn.Module):
         self.register_buffer('zero', torch.zeros(shape))
 
     def configure(
-            self,
-            bits, perchannel=False, sym=True, 
-            mse=False, norm=2.4, grid=100, maxshrink=.8
+        self,
+        bits, perchannel=False, sym=True, 
+        mse=False, norm=2.4, grid=100, maxshrink=.8,
+        trits=False
         ):
+        
         self.maxq = torch.tensor(2 ** bits - 1)
         self.perchannel = perchannel
         self.sym = sym
@@ -27,6 +31,8 @@ class Quantizer(nn.Module):
         self.norm = norm
         self.grid = grid
         self.maxshrink = maxshrink 
+        if trits:
+            self.maxq = torch.tensor(-1) 
 
     def find_params(self, x, weight=False):
         dev = x.device
@@ -60,11 +66,15 @@ class Quantizer(nn.Module):
         xmin[tmp] = -1
         xmax[tmp] = +1
 
-        self.scale = (xmax - xmin) / self.maxq
-        if self.sym:
-            self.zero = torch.full_like(self.scale, (self.maxq + 1) / 2)
+        if self.maxq < 0:
+            self.scale = xmax
+            self.zero = xmin
         else:
-            self.zero = torch.round(-xmin / self.scale)
+            self.scale = (xmax - xmin) / self.maxq
+            if self.sym:
+                self.zero = torch.full_like(self.scale, (self.maxq + 1) / 2)
+            else:
+                self.zero = torch.round(-xmin / self.scale)
 
         if self.mse:
             best = torch.full([x.shape[0]], float('inf'), device=dev)
@@ -141,7 +151,7 @@ class QuantLinear(nn.Module):
         self.register_buffer('scales', torch.zeros((math.ceil(infeatures/groupsize),outfeatures)))
         self.register_buffer('bias', torch.zeros(outfeatures))
         self.register_buffer(
-            'qweight', torch.zeros((infeatures // 256 * (bits * 8), outfeatures), dtype=torch.int)
+            'qweight', torch.zeros((infeatures // 32 * bits, outfeatures), dtype=torch.int)
         )
         self._initialized_quant_state = False
 
@@ -161,7 +171,7 @@ class QuantLinear(nn.Module):
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
         qweight = np.zeros(
-            (intweight.shape[0] // 256 * (self.bits * 8), intweight.shape[1]), dtype=np.uint32
+            (intweight.shape[0] // 32 * self.bits, intweight.shape[1]), dtype=np.uint32
         )
         i = 0
         row = 0
