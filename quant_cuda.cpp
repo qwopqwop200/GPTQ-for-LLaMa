@@ -62,9 +62,25 @@ void vecquant8matmul(
   vecquant8matmul_cuda(vec, mat, mul, scales, zeros, groupsize);
 }
 
+void vecquant3matmul_faster_cuda(
+  torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize, int vec_height
+); 
+
+void vecquant3matmul_faster(
+  torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
+  torch::Tensor scales, torch::Tensor zeros,
+  int groupsize, int vec_height
+) {
+  const at::cuda::OptionalCUDAGuard device_guard(device_of(vec));
+  vecquant3matmul_faster_cuda(vec, mat, mul, scales, zeros, groupsize, vec_height);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("vecquant2matmul", &vecquant2matmul, "Vector 2-bit Quantized Matrix Multiplication (CUDA)");
   m.def("vecquant3matmul", &vecquant3matmul, "Vector 3-bit Quantized Matrix Multiplication (CUDA)");
   m.def("vecquant4matmul", &vecquant4matmul, "Vector 4-bit Quantized Matrix Multiplication (CUDA)");
   m.def("vecquant8matmul", &vecquant8matmul, "Vector 8-bit Quantized Matrix Multiplication (CUDA)");
+  m.def("vecquant3matmul_faster", &vecquant3matmul_faster, "Vector 3-bit Quantized Matrix Multiplication (CUDA), faster version");
 }
