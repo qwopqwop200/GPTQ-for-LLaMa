@@ -219,7 +219,7 @@ def llama_eval(model, testenc, dev):
 def llama_pack(model, quantizers, wbits, groupsize):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, wbits, groupsize)
+    make_quant(model, quantizers, wbits, groupsize, faster=args.faster_kernel)
     qlayers = find_layers(model, [QuantLinear])
     print('Packing ...')
     for name in qlayers:
@@ -249,7 +249,7 @@ def load_quant(model, checkpoint, wbits, groupsize):
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    make_quant(model, layers, wbits, groupsize)
+    make_quant(model, layers, wbits, groupsize, faster=args.faster_kernel)
 
     del layers
     
@@ -425,8 +425,10 @@ if __name__ == '__main__':
         '--new-eval', action='store_true',
         help='Whether to use the new PTB and C4 eval'
     )
-    
-
+    parser.add_argument(
+        '--faster-kernel', action='store_true',
+        help='Whether to use the new faster kernel for benchmarking.'
+    )
     args = parser.parse_args()
 
     if type(args.load) is not str:
