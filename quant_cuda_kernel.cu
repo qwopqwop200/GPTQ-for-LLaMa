@@ -2,6 +2,7 @@
 #include <torch/python.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cuda_fp16.h>
 
 // atomicAdd for double-precision floating-point numbers on hardware with
 // compute capability < 6.0 from:
@@ -35,7 +36,7 @@ __global__ void VecQuant2MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  	int* __restrict__ zeros,
+    const  		int* __restrict__ zeros,
     int batch,
     int vec_height, 	
     int height,
@@ -81,6 +82,20 @@ __global__ void VecQuant8MatMulKernel(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  	int* __restrict__ zeros,
+    int batch,
+    int vec_height, 	
+    int height,
+    int width,
+    int zero_width,
+    int groupsize
+);
+
+__global__ void VecQuant3MatMulKernelFaster(
+    const  half2* __restrict__ vec,
+    const    int* __restrict__ mat,
+           float* __restrict__ mul,
+    const  float* __restrict__ scales,
+    const    int* __restrict__ zeros,
     int batch,
     int vec_height, 	
     int height,
@@ -253,7 +268,7 @@ __global__ void VecQuant3MatMulKernel(
   int g_h = (h / 3) * 32;
   int k = 0;
   
-  int z_w = (w / 32) * 3; // ((w / 256) * 24) / 3 
+  int z_w = (w / 32) * 3; 
   int z_mod = w % 32;
   int z_bit;
   
@@ -518,6 +533,158 @@ __global__ void VecQuant8MatMulKernel(
 	
     i += width;
     k += 4;
+  }
+
+  atomicAdd(&mul[b * width + w], res);
+}
+
+void vecquant3matmul_faster_cuda(
+  torch::Tensor vec,
+  torch::Tensor mat,
+  torch::Tensor mul,
+  torch::Tensor scales,
+  torch::Tensor zeros,
+  int groupsize,
+  int vec_height
+) {
+  int batch = vec.size(0);
+  int height = mat.size(0);
+  int width = mat.size(1);
+  int zero_width = zeros.size(1);
+  
+  dim3 blocks(
+    (height + BLOCKHEIGHT3 - 1) / BLOCKHEIGHT3,
+    (width + BLOCKWIDTH - 1) / BLOCKWIDTH,
+    batch
+  );
+  dim3 threads(BLOCKWIDTH);
+
+  VecQuant3MatMulKernelFaster<<<blocks, threads>>>(
+    (half2*) vec.data_ptr(),
+    mat.data_ptr<int>(),
+    mul.data_ptr<float>(),
+    scales.data_ptr<float>(),
+    zeros.data_ptr<int>(),
+    batch, vec_height, height, width, zero_width, groupsize
+  );
+}
+
+__global__ void VecQuant3MatMulKernelFaster(
+    const  half2* __restrict__ vec,
+    const    int* __restrict__ mat,
+           float* __restrict__ mul,
+    const  float* __restrict__ scales,
+    const  	 int* __restrict__ zeros,
+	int batch,
+	int vec_height,
+    int height,
+    int width,
+    int zero_width,
+    int groupsize
+) {
+  const int blockwidth2 = BLOCKWIDTH / 2;
+  int b = blockIdx.z;
+  int h = BLOCKHEIGHT3 * blockIdx.x;
+  int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
+
+  __shared__ half2 blockvec[blockwidth2];
+  if (threadIdx.x < blockwidth2)
+    blockvec[threadIdx.x] = vec[b * vec_height + blockIdx.x * blockwidth2 + threadIdx.x];
+
+  __shared__ half2 deq2[64][32];
+  int val = threadIdx.x / 32;
+  int off = threadIdx.x % 32;
+  for (; val < 64; val += BLOCKWIDTH / 32) {
+    deq2[val][off] = __halves2half2(
+       __int2half_rn(val & 0x7), __int2half_rn(val >> 3)
+    );
+  }
+
+  int i = width * h + w;
+  int g_h = (h / 3) * 32;
+  int k = 0;
+  
+  int z_w = (w / 32) * 3;
+  int z_mod = w % 32;
+  int z_bit;
+  
+  if (z_mod != 10){
+    if (z_mod != 21){
+      z_bit = z_mod;
+      if (z_bit > 21){
+        z_bit -= 22;
+        z_bit *= 3;
+        z_bit += 2;
+        z_w += 2;
+      } else if (z_bit > 10){
+        z_bit -= 11;
+        z_bit *= 3;
+        z_bit += 1;
+        z_w += 1;
+      } else {
+        z_bit *= 3;
+      }
+    } else {
+      z_w += 1;
+    }
+  }
+
+  float res = 0;
+  half2 res2;
+
+  unsigned int tmp1;
+  unsigned int tmp2;
+  unsigned int tmp;
+  unsigned int z_tmp;
+
+  __syncthreads();
+
+  while (k < blockwidth2) {
+    int g = (g_h + (k * 2)) / groupsize;
+	float scale_f = scales[g * width + w];
+    half2 scale = __float2half2_rn(scale_f);
+    half2 zero;
+    if (z_mod == 10) {
+      z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 30) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 2) & 0x4);
+      zero = __float2half2_rn(-(scale_f * ((z_tmp) + 1)));
+    } else if (z_mod == 21){
+      z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 31) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 1) & 0x6);
+      zero = __float2half2_rn(-(scale_f * ((z_tmp) + 1)));
+    } else {
+      zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1)));
+    }
+	
+    res2 = {};
+    tmp1 = as_unsigned(mat[i]);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >>  6) & 0x3f][off], scale, zero), blockvec[k + 1], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >> 12) & 0x3f][off], scale, zero), blockvec[k + 2], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >> 18) & 0x3f][off], scale, zero), blockvec[k + 3], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >> 24) & 0x3f][off], scale, zero), blockvec[k + 4], res2);
+    i += width;
+    tmp2 = as_unsigned(mat[i]);
+    tmp = (tmp1 >> 30) | ((tmp2 << 2) & 0x3c);
+    res2 = __hfma2(__hfma2(deq2[tmp][off], scale, zero), blockvec[k + 5], res2);
+    tmp2 >>= 4;
+    k += 6;
+    res2 = __hfma2(__hfma2(deq2[(tmp2 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp2 >>  6) & 0x3f][off], scale, zero), blockvec[k + 1], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp2 >> 12) & 0x3f][off], scale, zero), blockvec[k + 2], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp2 >> 18) & 0x3f][off], scale, zero), blockvec[k + 3], res2);
+    i += width;
+    tmp1 = as_unsigned(mat[i]);
+    tmp = (tmp2 >> 24) | ((tmp1 << 4) & 0x30);
+    res2 = __hfma2(__hfma2(deq2[tmp][off], scale, zero), blockvec[k + 4], res2);
+    tmp1 >>= 2;
+    k += 5;
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >>  6) & 0x3f][off], scale, zero), blockvec[k + 1], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >> 12) & 0x3f][off], scale, zero), blockvec[k + 2], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >> 18) & 0x3f][off], scale, zero), blockvec[k + 3], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp1 >> 24) & 0x3f][off], scale, zero), blockvec[k + 4], res2);
+    i += width;
+    k += 5;
+    res += __half2float(res2.x) + __half2float(res2.y);
   }
 
   atomicAdd(&mul[b * width + w], res);
