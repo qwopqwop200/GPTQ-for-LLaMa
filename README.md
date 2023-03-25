@@ -14,8 +14,6 @@ Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab
 
 **Currently, `groupsize` and `act-order` do not work together and you must choose one of them.**
 
-* We will release a [fast cuda kernel](https://github.com/IST-DASLab/gptq/blob/main/quant_cuda_kernel.cu#L167) as soon as possible.
-
 ## Result
 <details>
 <summary>LLaMa-7B(click me)</summary>
