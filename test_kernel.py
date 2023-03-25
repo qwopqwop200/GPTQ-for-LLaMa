@@ -41,24 +41,35 @@ zeros = torch.randint(-1000000000, 1000000000, (1, N // 256 * 32), device=DEV, d
 
 COUNT = 1000
 import time
+vec = vec.float()
 tick = time.time()
 for _ in range(COUNT):
     quant_cuda.vecquant2matmul(vec, mat, mul, scales, zeros, M)
     torch.cuda.synchronize()
 print('2bit:', (time.time() - tick) / COUNT)
 
+vec = vec.float()
 tick = time.time()
 for _ in range(COUNT):
     quant_cuda.vecquant3matmul(vec, mat, mul, scales, zeros, M)
     torch.cuda.synchronize()
 print('3bit:', (time.time() - tick) / COUNT)
 
+vec = vec.half()
+tick = time.time()
+for _ in range(COUNT):
+    quant_cuda.vecquant3matmul_faster(vec, mat, mul, scales, zeros, M, M//2)
+    torch.cuda.synchronize()
+print('3bit:', (time.time() - tick) / COUNT, '(faster)')
+
+vec = vec.float()
 tick = time.time()
 for _ in range(COUNT):
     quant_cuda.vecquant4matmul(vec, mat, mul, scales, zeros, M)
     torch.cuda.synchronize()
 print('4bit:', (time.time() - tick) / COUNT)
 
+vec = vec.float()
 tick = time.time()
 for _ in range(COUNT):
     quant_cuda.vecquant8matmul(vec, mat, mul, scales, zeros, M)
@@ -88,9 +99,10 @@ qlayer = qlayer.to(DEV)
 layer = layer.to(DEV)
 
 with torch.no_grad():
-    print('2bit Simu:', qlayer(vec))
-    print('2bit Kern:', layer.to(DEV)(vec))
+    print('2bit Simu:', layer.to(DEV)(vec))
+    print('2bit Kern:', qlayer(vec))
     print('\n')
+    
 
 layer = nn.Linear(M, N)
 vec = torch.randn(B,L,M).to(DEV)
@@ -109,8 +121,10 @@ qlayer = qlayer.to(DEV)
 layer = layer.to(DEV)
 
 with torch.no_grad():
-    print('3bit Simu:', qlayer(vec))
-    print('3bit Kern:', layer.to(DEV)(vec))
+    print('3bit Simu:', layer.to(DEV)(vec))
+    print('3bit Kern:', qlayer(vec))
+    qlayer.faster = True
+    print('3bit Kern:', qlayer(vec.half()), '(faster)')
     print('\n')
 
 layer = nn.Linear(M, N)
@@ -130,8 +144,8 @@ qlayer = qlayer.to(DEV)
 layer = layer.to(DEV) 
 
 with torch.no_grad():
-    print('4bit Simu:', qlayer(vec))
-    print('4bit Kern:', layer.to(DEV)(vec))
+    print('4bit Simu:', layer.to(DEV)(vec))
+    print('4bit Kern:', qlayer(vec))
     print('\n')
 
 layer = nn.Linear(M, N)
@@ -151,5 +165,6 @@ qlayer = qlayer.to(DEV)
 layer = layer.to(DEV)
 
 with torch.no_grad():
-    print('8bit Simu:', qlayer(vec))
-    print('8bit Kern:', layer.to(DEV)(vec))
+    print('8bit Simu:', layer.to(DEV)(vec))
+    print('8bit Kern:', qlayer(vec))
+    print('\n')
