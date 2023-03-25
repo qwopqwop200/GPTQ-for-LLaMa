@@ -136,7 +136,7 @@ except:
 
 # Assumes layer is perfectly divisible into 256 * 256 blocks
 class QuantLinear(nn.Module): 
-    def __init__(self, bits, groupsize, infeatures, outfeatures):
+    def __init__(self, bits, groupsize, infeatures, outfeatures, faster=False):
         super().__init__()
         if bits not in [2,3,4,8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
@@ -153,7 +153,9 @@ class QuantLinear(nn.Module):
         self.register_buffer(
             'qweight', torch.zeros((infeatures // 32 * bits, outfeatures), dtype=torch.int)
         )
+        self.half_indim = self.infeatures // 2
         self._initialized_quant_state = False
+        self.faster = faster
 
     def pack(self, linear, scales, zeros):
         scales = scales.t().contiguous()
@@ -243,13 +245,11 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros) 
 
     def forward(self, x):
-        intermediate_dtype = torch.float32
-
         if not self._initialized_quant_state:
             # Do we even have a bias? Check for at least one non-zero element.
             if self.bias is not None and bool(torch.any(self.bias != 0)):
                 # Then make sure it's the right type.
-                self.bias.data = self.bias.data.to(intermediate_dtype)
+                self.bias.data = self.bias.data.to(torch.float32)
             else:
                 self.bias = None
 
@@ -257,26 +257,33 @@ class QuantLinear(nn.Module):
         outshape[-1] = self.outfeatures
         x = x.reshape(-1, x.shape[-1])
         if self.bias is None:
-            y = torch.zeros(x.shape[0], outshape[-1], dtype=intermediate_dtype, device=x.device)
+            y = torch.zeros(x.shape[0], outshape[-1], dtype=torch.float32, device=x.device)
         else:
             y = self.bias.clone().repeat(x.shape[0], 1)
 
         output_dtype = x.dtype
-        x = x.to(intermediate_dtype)
-        if self.bits == 2:
-            quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
-        elif self.bits == 3:
-            quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
-        elif self.bits == 4:
-            quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
-        elif self.bits == 8:
-            quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
+        if self.faster:
+            x = x.half()
+            if self.bits == 3:
+                quant_cuda.vecquant3matmul_faster(x, self.qweight, y, self.scales, self.qzeros, self.groupsize, self.half_indim)
+            else:
+                raise NotImplementedError("Only 3 bits are supported.")
         else:
-            raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+            x = x.float()
+            if self.bits == 2:
+                quant_cuda.vecquant2matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
+            elif self.bits == 3:
+                quant_cuda.vecquant3matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
+            elif self.bits == 4:
+                quant_cuda.vecquant4matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
+            elif self.bits == 8:
+                quant_cuda.vecquant8matmul(x, self.qweight, y, self.scales, self.qzeros, self.groupsize)
+            else:
+                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         y = y.to(output_dtype)
         return y.reshape(outshape)
 
-def make_quant(module, names, bits, groupsize, name=''):
+def make_quant(module, names, bits, groupsize, faster=False, name=''):
     if isinstance(module, QuantLinear):
         return
     for attr in dir(module):
@@ -285,7 +292,7 @@ def make_quant(module, names, bits, groupsize, name=''):
         if name1 in names:
             delattr(module, attr)
             setattr(
-                module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features)
+                module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, faster=faster)
             )
     for name1, child in module.named_children():
-        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
+        make_quant(child, names, bits, groupsize, faster, name + '.' + name1 if name != '' else name1)
