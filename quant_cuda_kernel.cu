@@ -132,20 +132,6 @@ __global__ void VecQuant4MatMulKernelFaster(
     int groupsize
 );
 
-__global__ void VecQuant8MatMulKernelFaster(
-    const  half2* __restrict__ vec,
-    const    int* __restrict__ mat,
-           float* __restrict__ mul,
-    const  float* __restrict__ scales,
-    const    int* __restrict__ zeros,
-    int batch,
-    int vec_height, 	
-    int height,
-    int width,
-    int zero_width,
-    int groupsize
-);
-
 const int BLOCKWIDTH  = 256;
 const int BLOCKHEIGHT2 =  16;
 const int BLOCKHEIGHT3 =  24;
