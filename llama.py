@@ -219,7 +219,7 @@ def llama_eval(model, testenc, dev):
 def llama_pack(model, quantizers, wbits, groupsize):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, wbits, groupsize, faster=args.faster_kernel)
+    make_quant(model, quantizers, wbits, groupsize)
     qlayers = find_layers(model, [QuantLinear])
     print('Packing ...')
     for name in qlayers:
@@ -230,7 +230,7 @@ def llama_pack(model, quantizers, wbits, groupsize):
     print('Done.')
     return model
 
-def load_quant(model, checkpoint, wbits, groupsize):
+def load_quant(model, checkpoint, wbits, groupsize=-1,faster_kernel=False):
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -249,7 +249,7 @@ def load_quant(model, checkpoint, wbits, groupsize):
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    make_quant(model, layers, wbits, groupsize, faster=args.faster_kernel)
+    make_quant(model, layers, wbits, groupsize, faster=faster_kernel)
 
     del layers
     
@@ -435,7 +435,7 @@ if __name__ == '__main__':
         args.load = args.load.as_posix()
     
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize, args.faster_kernel)
     else:
         model = get_llama(args.model)
         model.eval()
