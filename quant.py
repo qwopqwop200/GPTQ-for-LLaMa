@@ -264,10 +264,14 @@ class QuantLinear(nn.Module):
         output_dtype = x.dtype
         if self.faster:
             x = x.half()
-            if self.bits == 3:
+            if self.bits == 2:
+                quant_cuda.vecquant2matmul_faster(x, self.qweight, y, self.scales, self.qzeros, self.groupsize, self.half_indim)
+            elif self.bits == 3:
                 quant_cuda.vecquant3matmul_faster(x, self.qweight, y, self.scales, self.qzeros, self.groupsize, self.half_indim)
+            elif self.bits == 4:
+                quant_cuda.vecquant4matmul_faster(x, self.qweight, y, self.scales, self.qzeros, self.groupsize, self.half_indim)
             else:
-                raise NotImplementedError("Only 3 bits are supported.")
+                raise NotImplementedError("Only 2,3,4 bits are supported.")
         else:
             x = x.float()
             if self.bits == 2:
