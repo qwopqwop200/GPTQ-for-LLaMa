@@ -90,7 +90,49 @@ __global__ void VecQuant8MatMulKernel(
     int groupsize
 );
 
+__global__ void VecQuant2MatMulKernelFaster(
+    const  half2* __restrict__ vec,
+    const    int* __restrict__ mat,
+           float* __restrict__ mul,
+    const  float* __restrict__ scales,
+    const    int* __restrict__ zeros,
+    int batch,
+    int vec_height,
+    int height,
+    int width,
+    int zero_width,
+    int groupsize
+);
+
 __global__ void VecQuant3MatMulKernelFaster(
+    const  half2* __restrict__ vec,
+    const    int* __restrict__ mat,
+           float* __restrict__ mul,
+    const  float* __restrict__ scales,
+    const    int* __restrict__ zeros,
+    int batch,
+    int vec_height, 	
+    int height,
+    int width,
+    int zero_width,
+    int groupsize
+);
+
+__global__ void VecQuant4MatMulKernelFaster(
+    const  half2* __restrict__ vec,
+    const    int* __restrict__ mat,
+           float* __restrict__ mul,
+    const  float* __restrict__ scales,
+    const    int* __restrict__ zeros,
+    int batch,
+    int vec_height, 	
+    int height,
+    int width,
+    int zero_width,
+    int groupsize
+);
+
+__global__ void VecQuant8MatMulKernelFaster(
     const  half2* __restrict__ vec,
     const    int* __restrict__ mat,
            float* __restrict__ mul,
@@ -538,6 +580,107 @@ __global__ void VecQuant8MatMulKernel(
   atomicAdd(&mul[b * width + w], res);
 }
 
+
+void vecquant2matmul_faster_cuda(
+  torch::Tensor vec,
+  torch::Tensor mat,
+  torch::Tensor mul,
+  torch::Tensor scales,
+  torch::Tensor zeros,
+  int groupsize,
+  int vec_height
+) {
+  int batch = vec.size(0);
+  int height = mat.size(0);
+  int width = mat.size(1);
+  int zero_width = zeros.size(1);
+  
+  dim3 blocks(
+    (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2,
+    (width + BLOCKWIDTH - 1) / BLOCKWIDTH,
+    batch
+  );
+  dim3 threads(BLOCKWIDTH);
+
+  VecQuant2MatMulKernelFaster<<<blocks, threads>>>(
+    (half2*) vec.data_ptr(),
+    mat.data_ptr<int>(),
+    mul.data_ptr<float>(),
+    scales.data_ptr<float>(),
+    zeros.data_ptr<int>(),
+    batch, vec_height, height, width, zero_width, groupsize
+  );
+}
+
+__global__ void VecQuant2MatMulKernelFaster(
+    const  half2* __restrict__ vec,
+    const    int* __restrict__ mat,
+           float* __restrict__ mul,
+    const  float* __restrict__ scales,
+    const  	 int* __restrict__ zeros,
+	int batch,
+	int vec_height,
+    int height,
+    int width,
+    int zero_width,
+    int groupsize
+) {
+  const int blockwidth2 = BLOCKWIDTH / 2;
+  int b = blockIdx.z;
+  int h = BLOCKHEIGHT2 * blockIdx.x;
+  int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
+
+  __shared__ half2 blockvec[blockwidth2];
+  if (threadIdx.x < blockwidth2)
+    blockvec[threadIdx.x] = vec[b * vec_height + blockIdx.x * blockwidth2 + threadIdx.x];
+
+  __shared__ half2 deq2[16][16];
+  int val = threadIdx.x / 16;
+  int off = threadIdx.x % 16;
+  for (; val < 16; val += BLOCKWIDTH / 16) {
+    deq2[val][off] = __halves2half2(
+       __int2half_rn(val & 0x3), __int2half_rn(val >> 2)
+    );
+  }
+
+  int i = width * h + w;
+  int g_h = h * 16;
+  int k = 0;
+  
+  int z_w = w / 16; 
+  int z_mod = (w % 16) * 2;
+
+  float res = 0;
+  half2 res2;
+
+  unsigned int tmp;
+
+  __syncthreads();
+
+  while (k < blockwidth2) {
+    int g = (g_h + (k * 2)) / groupsize;
+	float scale_f = scales[g * width + w];
+    half2 scale = __float2half2_rn(scale_f);
+    half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0x3) + 1)));
+	
+    res2 = {};
+    tmp = as_unsigned(mat[i]);
+    res2 = __hfma2(__hfma2(deq2[(tmp >>  0) & 0xf][off], scale, zero), blockvec[k + 0], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >>  4) & 0xf][off], scale, zero), blockvec[k + 1], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >>  8) & 0xf][off], scale, zero), blockvec[k + 2], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >> 12) & 0xf][off], scale, zero), blockvec[k + 3], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >> 16) & 0xf][off], scale, zero), blockvec[k + 4], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >> 20) & 0xf][off], scale, zero), blockvec[k + 5], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >> 24) & 0xf][off], scale, zero), blockvec[k + 6], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >> 28) & 0xf][off], scale, zero), blockvec[k + 7], res2);
+	i += width;
+    k += 8;
+    res += __half2float(res2.x) + __half2float(res2.y);
+  }
+
+  atomicAdd(&mul[b * width + w], res);
+}
+
 void vecquant3matmul_faster_cuda(
   torch::Tensor vec,
   torch::Tensor mat,
@@ -684,6 +827,102 @@ __global__ void VecQuant3MatMulKernelFaster(
     res2 = __hfma2(__hfma2(deq2[(tmp1 >> 24) & 0x3f][off], scale, zero), blockvec[k + 4], res2);
     i += width;
     k += 5;
+    res += __half2float(res2.x) + __half2float(res2.y);
+  }
+
+  atomicAdd(&mul[b * width + w], res);
+}
+
+void vecquant4matmul_faster_cuda(
+  torch::Tensor vec,
+  torch::Tensor mat,
+  torch::Tensor mul,
+  torch::Tensor scales,
+  torch::Tensor zeros,
+  int groupsize,
+  int vec_height
+) {
+  int batch = vec.size(0);
+  int height = mat.size(0);
+  int width = mat.size(1);
+  int zero_width = zeros.size(1);
+  
+  dim3 blocks(
+    (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4,
+    (width + BLOCKWIDTH - 1) / BLOCKWIDTH,
+    batch
+  );
+  dim3 threads(BLOCKWIDTH);
+
+  VecQuant4MatMulKernelFaster<<<blocks, threads>>>(
+    (half2*) vec.data_ptr(),
+    mat.data_ptr<int>(),
+    mul.data_ptr<float>(),
+    scales.data_ptr<float>(),
+    zeros.data_ptr<int>(),
+    batch, vec_height, height, width, zero_width, groupsize
+  );
+}
+
+__global__ void VecQuant4MatMulKernelFaster(
+    const  half2* __restrict__ vec,
+    const    int* __restrict__ mat,
+           float* __restrict__ mul,
+    const  float* __restrict__ scales,
+    const  	 int* __restrict__ zeros,
+	int batch,
+	int vec_height,
+    int height,
+    int width,
+    int zero_width,
+    int groupsize
+) {
+  const int blockwidth2 = BLOCKWIDTH / 2;
+  int b = blockIdx.z;
+  int h = BLOCKHEIGHT4 * blockIdx.x;
+  int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
+
+  __shared__ half2 blockvec[blockwidth2];
+  if (threadIdx.x < blockwidth2)
+    blockvec[threadIdx.x] = vec[b * vec_height + blockIdx.x * blockwidth2 + threadIdx.x];
+
+  __shared__ half2 deq2[256][8];
+  int val = threadIdx.x / 8;
+  int off = threadIdx.x % 8;
+  for (; val < 256; val += BLOCKWIDTH / 8) {
+    deq2[val][off] = __halves2half2(
+       __int2half_rn(val & 0xF), __int2half_rn(val >> 4)
+    );
+  }
+
+  int i = width * h + w;
+  int g_h = h * 8;
+  int k = 0;
+
+  int z_w = w / 8; 
+  int z_mod = (w % 8) * 4;
+
+  float res = 0;
+  half2 res2;
+
+  unsigned int tmp;
+
+  __syncthreads();
+
+  while (k < blockwidth2) {
+    int g = (g_h + (k * 2)) / groupsize;
+	float scale_f = scales[g * width + w];
+    half2 scale = __float2half2_rn(scale_f);
+    half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1)));
+	
+    res2 = {};
+    tmp = as_unsigned(mat[i]);
+    res2 = __hfma2(__hfma2(deq2[(tmp >>  0) & 0xff][off], scale, zero), blockvec[k + 0], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >>  8) & 0xff][off], scale, zero), blockvec[k + 1], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >> 16) & 0xff][off], scale, zero), blockvec[k + 2], res2);
+    res2 = __hfma2(__hfma2(deq2[(tmp >> 24) & 0xff][off], scale, zero), blockvec[k + 3], res2);
+	i += width;
+    k += 4;
     res += __half2float(res2.x) + __half2float(res2.y);
   }
 
