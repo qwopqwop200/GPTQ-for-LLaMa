@@ -130,7 +130,7 @@ class Quantizer(nn.Module):
 
 
 try:
-    import quant_cuda
+    from . import quant_cuda
 except:
     print('CUDA extension not installed.')
 

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import quant_cuda
+from gptq_llama import quant_cuda
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
