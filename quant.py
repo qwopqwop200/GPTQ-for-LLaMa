@@ -279,9 +279,10 @@ class QuantLinear(nn.Module):
                 zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 8), self.wf2).to(torch.int8)
                 torch.bitwise_and(zeros, 0x0000000F, out=zeros)
                 zeros = zeros + 1
-                zeros = zeros.reshape(-1, zeros.shape[1] * zeros.shape[2])
+                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
 
                 scales = self.scales
+                scales = scales.reshape(-1, 1, scales.shape[-1])
 
                 weights = (scales * (weight - zeros))
                 weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
