@@ -48,6 +48,13 @@ for _ in range(COUNT):
     torch.cuda.synchronize()
 print('2bit:', (time.time() - tick) / COUNT)
 
+vec = vec.half()
+tick = time.time()
+for _ in range(COUNT):
+    quant_cuda.vecquant2matmul_faster(vec, mat, mul, scales, zeros, M, M//2)
+    torch.cuda.synchronize()
+print('2bit:', (time.time() - tick) / COUNT, '(faster)')
+
 vec = vec.float()
 tick = time.time()
 for _ in range(COUNT):
@@ -68,6 +75,13 @@ for _ in range(COUNT):
     quant_cuda.vecquant4matmul(vec, mat, mul, scales, zeros, M)
     torch.cuda.synchronize()
 print('4bit:', (time.time() - tick) / COUNT)
+
+vec = vec.half()
+tick = time.time()
+for _ in range(COUNT):
+    quant_cuda.vecquant4matmul_faster(vec, mat, mul, scales, zeros, M, M//2)
+    torch.cuda.synchronize()
+print('4bit:', (time.time() - tick) / COUNT, '(faster)')
 
 vec = vec.float()
 tick = time.time()
@@ -101,8 +115,9 @@ layer = layer.to(DEV)
 with torch.no_grad():
     print('2bit Simu:', layer.to(DEV)(vec))
     print('2bit Kern:', qlayer(vec))
+    qlayer.faster = True
+    print('2bit Kern:', qlayer(vec.half()), '(faster)')
     print('\n')
-    
 
 layer = nn.Linear(M, N)
 vec = torch.randn(B,L,M).to(DEV)
@@ -146,6 +161,8 @@ layer = layer.to(DEV)
 with torch.no_grad():
     print('4bit Simu:', layer.to(DEV)(vec))
     print('4bit Kern:', qlayer(vec))
+    qlayer.faster = True
+    print('4bit Kern:', qlayer(vec.half()), '(faster)')
     print('\n')
 
 layer = nn.Linear(M, N)
