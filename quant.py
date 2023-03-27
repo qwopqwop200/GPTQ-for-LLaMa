@@ -163,15 +163,15 @@ class QuantLinear(nn.Module):
             self.kernel_switch_threshold = 128 if self.kernel_switch_threshold else None
         if not self.kernel_switch_threshold is None:
             # Buffers for bit shifting weight unpacking
-            if self.bits == 4:
+            if self.bits == 2:
                 self.register_buffer(
                     'wf1',
-                    torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(2),
+                    torch.tensor([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30], dtype=torch.int32).unsqueeze(0).unsqueeze(2),
                     persistent=False
                 )
                 self.register_buffer(
                     'wf2',
-                    torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(0),
+                    torch.tensor([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30], dtype=torch.int32).unsqueeze(0).unsqueeze(0),
                     persistent=False
                 )
             elif self.bits == 3:
@@ -185,7 +185,29 @@ class QuantLinear(nn.Module):
                     [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
                     [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
                 ], dtype=torch.int32).reshape(1,1,3,12), persistent=False)
-
+            elif self.bits == 4:
+                self.register_buffer(
+                    'wf1',
+                    torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(2),
+                    persistent=False
+                )
+                self.register_buffer(
+                    'wf2',
+                    torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(0),
+                    persistent=False
+                )
+            elif self.bits == 8:
+                self.register_buffer(
+                    'wf1',
+                    torch.tensor([0, 8, 16, 24], dtype=torch.int32).unsqueeze(0).unsqueeze(2),
+                    persistent=False
+                )
+                self.register_buffer(
+                    'wf2',
+                    torch.tensor([0, 8, 16, 24], dtype=torch.int32).unsqueeze(0).unsqueeze(0),
+                    persistent=False
+                )
+                
     def pack(self, linear, scales, zeros):
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
@@ -282,17 +304,16 @@ class QuantLinear(nn.Module):
             else:
                 self.bias = None
 
-        if not self.kernel_switch_threshold is None and x.shape[-2] >= self.kernel_switch_threshold and self.bias is None:
-            # Unpack weights and fall back to torch.matmul
-            # Supports only 3 and 4 bits
-            if self.bits == 4 :
-                # Unpack 4bit weights
-                weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 8, -1), self.wf1).to(torch.int8)
-                torch.bitwise_and(weight, 0x0000000F, out=weight)
+        if not self.kernel_switch_threshold is None and (x.shape[0] * x.shape[1]) >= self.kernel_switch_threshold:
+            if self.bits == 2:
+                # Unpack 2bit weights
+                
+                weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 16, -1), self.wf1).to(torch.int8)
+                torch.bitwise_and(weight, 0x00000003, out=weight)
                 weight = weight.reshape(-1, self.groupsize, weight.shape[2])
 
-                zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 8), self.wf2).to(torch.int8)
-                torch.bitwise_and(zeros, 0x0000000F, out=zeros)
+                zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 16), self.wf2).to(torch.int8)
+                torch.bitwise_and(zeros, 0x00000003, out=zeros)
                 zeros = zeros + 1
                 zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
 
@@ -302,10 +323,12 @@ class QuantLinear(nn.Module):
                 weights = (scales * (weight - zeros))
                 weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
                 x = torch.matmul(x, weights.to(x.dtype))
+                x = x + self.bias if self.bias is not None else x
                 return x
+            
             elif self.bits == 3:
+            
                 # Unpack 3bit weights
-
                 weight = self.qweight.reshape(self.qweight.shape[0]//3, 3, 1, self.qweight.shape[1]).expand(-1, -1, 12, -1)
                 weight = (weight >> self.wf1)&0x7
                 weight[:,0,10] = (weight[:,0,10]&0x3) | ((weight[:,1,0] << 2)&0x4)
@@ -329,10 +352,50 @@ class QuantLinear(nn.Module):
                 weights = (scales * (weight - zeros))
                 weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
                 x = torch.matmul(x, weights.to(x.dtype))
+                x = x + self.bias if self.bias is not None else x
+                return x
+                
+            elif self.bits == 4:
+                # Unpack 4bit weights
+                weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 8, -1), self.wf1).to(torch.int8)
+                torch.bitwise_and(weight, 0x0000000F, out=weight)
+                weight = weight.reshape(-1, self.groupsize, weight.shape[2])
 
+                zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 8), self.wf2).to(torch.int8)
+                torch.bitwise_and(zeros, 0x0000000F, out=zeros)
+                zeros = zeros + 1
+                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
+
+                scales = self.scales
+                scales = scales.reshape(-1, 1, scales.shape[-1])
+
+                weights = (scales * (weight - zeros))
+                weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
+                x = torch.matmul(x, weights.to(x.dtype))
+                x = x + self.bias if self.bias is not None else x
+                return x
+                
+            elif self.bits == 8:
+                # Unpack 8bit weights
+                weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 4, -1), self.wf1).to(torch.int8)
+                torch.bitwise_and(weight, 0x000000FF, out=weight)
+                weight = weight.reshape(-1, self.groupsize, weight.shape[2])
+
+                zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 4), self.wf2).to(torch.int8)
+                torch.bitwise_and(zeros, 0x000000FF, out=zeros)
+                zeros = zeros + 1
+                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
+
+                scales = self.scales
+                scales = scales.reshape(-1, 1, scales.shape[-1])
+
+                weights = (scales * (weight - zeros))
+                weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
+                x = torch.matmul(x, weights.to(x.dtype))
+                x = x + self.bias if self.bias is not None else x
                 return x
             else:
-                raise NotImplementedError("Only 3,4 bits are supported.")
+                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
         outshape = list(x.shape)
         outshape[-1] = self.outfeatures
