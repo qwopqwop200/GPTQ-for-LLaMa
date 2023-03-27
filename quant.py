@@ -136,7 +136,7 @@ except:
 
 # Assumes layer is perfectly divisible into 256 * 256 blocks
 class QuantLinear(nn.Module): 
-    def __init__(self, bits, groupsize, infeatures, outfeatures, faster=False):
+    def __init__(self, bits, groupsize, infeatures, outfeatures, faster=False, kernel_switch_threshold=None):
         super().__init__()
         if bits not in [2,3,4,8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
@@ -156,21 +156,35 @@ class QuantLinear(nn.Module):
         self.half_indim = self.infeatures // 2
         self._initialized_quant_state = False
         self.faster = faster
-        # Buffers for bit shifting weight unpacking
-        if self.bits == 4:
-            self.register_buffer('wf1', torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(2), persistent=False)
-            self.register_buffer('wf2', torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(0), persistent=False)
-        elif self.bits == 3:
-            self.register_buffer('wf1', torch.tensor([
-                [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
-                [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
-                [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
-            ], dtype=torch.int32).reshape(1,3,12,1), persistent=False)
-            self.register_buffer('wf2', torch.tensor([
-                [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
-                [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
-                [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
-            ], dtype=torch.int32).reshape(1,1,3,12), persistent=False)
+        # kernel_switch_threshold is the cutoff input size after which matmul
+        # is performed by unpacking the weights and using torch.matmul
+        self.kernel_switch_threshold = kernel_switch_threshold
+        if isinstance(self.kernel_switch_threshold, bool):
+            self.kernel_switch_threshold = 128 if self.kernel_switch_threshold else None
+        if not self.kernel_switch_threshold is None:
+            # Buffers for bit shifting weight unpacking
+            if self.bits == 4:
+                self.register_buffer(
+                    'wf1',
+                    torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(2),
+                    persistent=False
+                )
+                self.register_buffer(
+                    'wf2',
+                    torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(0),
+                    persistent=False
+                )
+            elif self.bits == 3:
+                self.register_buffer('wf1', torch.tensor([
+                    [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
+                    [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
+                    [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
+                ], dtype=torch.int32).reshape(1,3,12,1), persistent=False)
+                self.register_buffer('wf2', torch.tensor([
+                    [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
+                    [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
+                    [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
+                ], dtype=torch.int32).reshape(1,1,3,12), persistent=False)
 
     def pack(self, linear, scales, zeros):
         scales = scales.t().contiguous()
@@ -268,8 +282,9 @@ class QuantLinear(nn.Module):
             else:
                 self.bias = None
 
-        if x.shape[-2] >= 128 and self.bias == None:
-            # Fall back to PyTorch matmul
+        if not self.kernel_switch_threshold is None and x.shape[-2] >= self.kernel_switch_threshold and self.bias is None:
+            # Unpack weights and fall back to torch.matmul
+            # Supports only 3 and 4 bits
             if self.bits == 4 :
                 # Unpack 4bit weights
                 weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 8, -1), self.wf1).to(torch.int8)
@@ -288,7 +303,7 @@ class QuantLinear(nn.Module):
                 weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
                 x = torch.matmul(x, weights.to(x.dtype))
                 return x
-            if self.bits == 3:
+            elif self.bits == 3:
                 # Unpack 3bit weights
 
                 weight = self.qweight.reshape(self.qweight.shape[0]//3, 3, 1, self.qweight.shape[1]).expand(-1, -1, 12, -1)
@@ -316,6 +331,8 @@ class QuantLinear(nn.Module):
                 x = torch.matmul(x, weights.to(x.dtype))
 
                 return x
+            else:
+                raise NotImplementedError("Only 3,4 bits are supported.")
 
         outshape = list(x.shape)
         outshape[-1] = self.outfeatures
@@ -351,7 +368,7 @@ class QuantLinear(nn.Module):
         y = y.to(output_dtype)
         return y.reshape(outshape)
 
-def make_quant(module, names, bits, groupsize, faster=False, name=''):
+def make_quant(module, names, bits, groupsize, faster=False, name='', kernel_switch_threshold=False):
     if isinstance(module, QuantLinear):
         return
     for attr in dir(module):
@@ -360,7 +377,7 @@ def make_quant(module, names, bits, groupsize, faster=False, name=''):
         if name1 in names:
             delattr(module, attr)
             setattr(
-                module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, faster=faster)
+                module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, faster=faster, kernel_switch_threshold=kernel_switch_threshold)
             )
     for name1, child in module.named_children():
-        make_quant(child, names, bits, groupsize, faster, name + '.' + name1 if name != '' else name1)
+        make_quant(child, names, bits, groupsize, faster, name + '.' + name1 if name != '' else name1, kernel_switch_threshold=kernel_switch_threshold)
