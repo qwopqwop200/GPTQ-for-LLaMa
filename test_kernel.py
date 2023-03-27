@@ -106,7 +106,7 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = QuantLinear(2, -1, layer.in_features, layer.out_features)
+qlayer = QuantLinear(2, -1, layer.in_features, layer.out_features, kernel_switch_threshold = False)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
@@ -129,7 +129,7 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = QuantLinear(3, -1, layer.in_features, layer.out_features)
+qlayer = QuantLinear(3, -1, layer.in_features, layer.out_features, kernel_switch_threshold = False)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
@@ -152,7 +152,7 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = QuantLinear(4, -1, layer.in_features, layer.out_features)
+qlayer = QuantLinear(4, -1, layer.in_features, layer.out_features, kernel_switch_threshold = False)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
@@ -175,7 +175,7 @@ layer.weight.data = quantize(
     layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq
 )
 
-qlayer = QuantLinear(8, -1, layer.in_features, layer.out_features)
+qlayer = QuantLinear(8, -1, layer.in_features, layer.out_features, kernel_switch_threshold = False)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
