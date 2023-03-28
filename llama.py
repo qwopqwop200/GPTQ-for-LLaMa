@@ -46,7 +46,6 @@ def llama_sequential(model, dataloader, dev):
             inps[cache['i']] = inp
             cache['i'] += 1
             cache['attention_mask'] = kwargs['attention_mask']
-            cache['position_ids'] = kwargs['position_ids']
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
@@ -63,7 +62,7 @@ def llama_sequential(model, dataloader, dev):
 
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
-    position_ids = cache['position_ids']
+
     print('Ready.')
 
     quantizers = {}
@@ -98,7 +97,7 @@ def llama_sequential(model, dataloader, dev):
             for name in subset:
                 handles.append(subset[name].register_forward_hook(add_batch(name)))
             for j in range(args.nsamples):
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids = position_ids)[0]
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
             for h in handles:
                 h.remove()
 
@@ -110,7 +109,7 @@ def llama_sequential(model, dataloader, dev):
                 gptq[name].free()
                 
         for j in range(args.nsamples):
-            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids = position_ids)[0]
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
 
         layers[i] = layer.cpu()
         del layer
@@ -151,7 +150,6 @@ def llama_eval(model, testenc, dev):
             inps[cache['i']] = inp
             cache['i'] += 1
             cache['attention_mask'] = kwargs['attention_mask']
-            cache['position_ids'] = kwargs['position_ids']
             raise ValueError
     layers[0] = Catcher(layers[0])
     for i in range(nsamples):
@@ -168,7 +166,6 @@ def llama_eval(model, testenc, dev):
 
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
-    position_ids = cache['position_ids']
 
     for i in range(len(layers)):
         print(i)
@@ -188,7 +185,7 @@ def llama_eval(model, testenc, dev):
                 ).to(next(iter(layer.parameters())).dtype)
 
         for j in range(nsamples):
-            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids = position_ids)[0]
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
         layers[i] = layer.cpu()
         del layer
         torch.cuda.empty_cache()
