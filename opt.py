@@ -113,8 +113,8 @@ def opt_sequential(model, dataloader, dev):
             for name in subset:
                 print(i, name)
                 print('Quantizing ...')
-                scale,zero = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
-                quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero)
+                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+                quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero,g_idx)
                 gptq[name].free()
             
         for j in range(args.nsamples):
@@ -247,9 +247,9 @@ def opt_pack(model, quantizers, wbits, groupsize):
     print('Packing ...')
     for name in qlayers:
         print(name)
-        quantizers[name],scale,zero = quantizers[name]
-        quantizers[name],scale,zero = quantizers[name].cpu(),scale.cpu(),zero.cpu()
-        qlayers[name].pack(layers[name], scale, zero)
+        quantizers[name],scale,zero,g_idx = quantizers[name]
+        quantizers[name],scale,zero,g_idx = quantizers[name].cpu(),scale.cpu(),zero.cpu(),g_idx.cpu()
+        qlayers[name].pack(layers[name], scale, zero, g_idx)
     print('Done.')
     return model
 
