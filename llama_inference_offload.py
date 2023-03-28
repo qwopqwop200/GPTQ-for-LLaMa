@@ -206,9 +206,9 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
         from safetensors.torch import load_file as safe_load
-        model.load_state_dict(safe_load(checkpoint))
+        model.load_state_dict(safe_load(checkpoint), strict = False)
     else:
-        model.load_state_dict(torch.load(checkpoint))
+        model.load_state_dict(torch.load(checkpoint), strict = False)
     model.seqlen = 2048
     
     for i in range(pre_layer):
