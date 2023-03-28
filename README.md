@@ -6,6 +6,9 @@ GPTQ is SOTA one-shot weight quantization method
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
 
 ## New Features
+**Changed to use only pytorch instead of the current cuda kernel.
+It has no impact on memory usage. There is a slowdown below 128 length, but much faster at 128 and above.**
+
 Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
 
 * Slightly adjusted preprocessing of C4 and PTB for more realistic evaluations (used in our updated results); can be activated via the flag --new-eval.
