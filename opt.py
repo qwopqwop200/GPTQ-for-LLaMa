@@ -253,7 +253,7 @@ def opt_pack(model, quantizers, wbits, groupsize):
     print('Done.')
     return model
 
-def load_quant(model, checkpoint, wbits, groupsize, faster_kernel):
+def load_quant(model, checkpoint, wbits, groupsize):
     from transformers import OPTConfig, OPTForCausalLM 
     config = OPTConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -272,16 +272,16 @@ def load_quant(model, checkpoint, wbits, groupsize, faster_kernel):
     for name in ['model.decoder.project_out', 'model.decoder.project_in', 'lm_head']:
         if name in layers:
             del layers[name]
-    make_quant(model, layers, wbits, groupsize, faster=faster_kernel)
+    make_quant(model, layers, wbits, groupsize)
     
     del layers
 
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
         from safetensors.torch import load_file as safe_load
-        model.load_state_dict(safe_load(checkpoint))
+        model.load_state_dict(safe_load(checkpoint), strict = False)
     else:
-        model.load_state_dict(torch.load(checkpoint))
+        model.load_state_dict(torch.load(checkpoint), strict = False)
     model.seqlen = model.config.max_position_embeddings
     print('Done.')
     return model
@@ -449,10 +449,7 @@ if __name__ == '__main__':
         '--new-eval', action='store_true',
         help='Whether to use the new PTB and C4 eval'
     )
-    parser.add_argument(
-        '--faster-kernel', action='store_true',
-        help='Whether to use the new faster kernel for benchmarking.'
-    )
+    
     args = parser.parse_args()
 
     if type(args.load) is not str:
