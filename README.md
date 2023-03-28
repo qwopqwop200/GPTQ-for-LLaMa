@@ -9,7 +9,6 @@ GPTQ is SOTA one-shot weight quantization method
 Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
 
 * Slightly adjusted preprocessing of C4 and PTB for more realistic evaluations (used in our updated results); can be activated via the flag --new-eval.
-* Optimized cuda kernels, which are considerably faster especially on the A100, e.g. 1.9x -> 3.25x generation speedup for OPT-175B; can be activated via --faster-kernel.
 * two new tricks:--act-order (quantizing columns in order of decreasing activation size) and --true-sequential (performing sequential quantization even within a single Transformer block). Those fix GPTQ's strangely bad performance on the 7B model (from 7.15 to 6.09 Wiki2 PPL) and lead to slight improvements on most models/settings in general. 
 
 **Currently, `groupsize` and `act-order` do not work together and you must choose one of them.**
@@ -88,10 +87,6 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvi
 git clone https://github.com/qwopqwop200/GPTQ-for-LLaMa
 cd GPTQ-for-LLaMa
 pip install -r requirements.txt
-python setup_cuda.py install
-
-# Benchmark performance for FC2 layer of LLaMa-7B
-CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 ```
 ## Dependencies
 
@@ -127,8 +122,6 @@ CUDA_VISIBLE_DEVICES=0 python llama_inference.py ./llama-hf/llama-7b --wbits 4 -
 CUDA_VISIBLE_DEVICES=0 python llama_inference_offload.py ./llama-hf/llama-7b --wbits 4 --load llama7b-4bit.pt --text "this is llama" --pre_layer 16
 It takes about 180 seconds to generate 45 tokens(5->50 tokens) on single RTX3090 based on LLaMa-65B. pre_layer is set to 50.
 ```
-CUDA Kernels support 2,3,4,8 bits and Faster CUDA Kernels support 2,3,4 bits.
-
 Basically, 4-bit quantization and 128 groupsize are recommended.
 
 # Acknowledgements
