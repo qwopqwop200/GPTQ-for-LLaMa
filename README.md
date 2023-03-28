@@ -7,7 +7,7 @@ GPTQ is SOTA one-shot weight quantization method
 
 ## New Features
 **Changed to use only pytorch instead of the current cuda kernel.
-It has no impact on memory usage. There is a slowdown below 128 length(If you use Transformers' use_cache, seq_len is effectively close to 1.), but much faster at 128 and above.**
+It has no impact on memory usage. There is a slowdown below 128 length(If you use Transformers' use_cache, length is effectively close to 1.), but much faster at 128 and above.**
 
 Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
 
