@@ -46,6 +46,7 @@ def llama_sequential(model, dataloader, dev):
             inps[cache['i']] = inp
             cache['i'] += 1
             cache['attention_mask'] = kwargs['attention_mask']
+            cache['position_ids'] = kwargs['position_ids']
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
@@ -62,7 +63,7 @@ def llama_sequential(model, dataloader, dev):
 
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
-
+    position_ids = cache['position_ids']
     print('Ready.')
 
     quantizers = {}
@@ -97,7 +98,7 @@ def llama_sequential(model, dataloader, dev):
             for name in subset:
                 handles.append(subset[name].register_forward_hook(add_batch(name)))
             for j in range(args.nsamples):
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids = position_ids)[0]
             for h in handles:
                 h.remove()
 
@@ -479,5 +480,3 @@ if __name__ == '__main__':
         )
         print(dataset)
         llama_eval(model, testloader, DEV)
-
-  
