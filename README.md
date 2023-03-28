@@ -5,9 +5,6 @@ GPTQ is SOTA one-shot weight quantization method
 
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
 
-**There is a pytorch branch that allows you to use `groupsize` and `act-order` together.**
-
-
 ## New Features
 **Changed to use only pytorch instead of the current cuda kernel.
 It has no impact on memory usage. There is a slowdown below 128 length, but much faster at 128 and above.**
