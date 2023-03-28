@@ -93,6 +93,7 @@ class GPTQ:
         H = torch.linalg.cholesky(H, upper=True)
         Hinv = H
         
+        g_idx = []
         scale = []
         zero = []
         now_idx = 1
@@ -114,7 +115,7 @@ class GPTQ:
                 if groupsize != -1:
                     if (i1 + i) % groupsize == 0:
                         self.quantizer.find_params(W[:, (i1 + i):(i1 + i + groupsize)], weight=True)
-                    
+
                     if ((i1 + i) // groupsize) - now_idx == -1:
                         scale.append(self.quantizer.scale)
                         zero.append(self.quantizer.zero)
@@ -145,9 +146,12 @@ class GPTQ:
         print('time %.2f' % (time.time() - tick))
         print('error', torch.sum(Losses).item())
         
+        g_idx = [i // groupsize  for i in range(self.columns)]
+        g_idx = torch.tensor(g_idx, dtype=torch.int32, device=Q.device)
         if actorder:
             invperm = torch.argsort(perm)
             Q = Q[:, invperm]
+            g_idx = g_idx[invperm]
 
         if isinstance(self.layer, transformers.Conv1D):
             Q = Q.t()
@@ -160,7 +164,7 @@ class GPTQ:
             zero.append(self.quantizer.zero)
         scale = torch.cat(scale,dim=1)
         zero = torch.cat(zero,dim=1)
-        return scale,zero
+        return scale,zero,g_idx
             
     def free(self):
         if DEBUG:
