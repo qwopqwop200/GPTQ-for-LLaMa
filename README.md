@@ -5,6 +5,8 @@ GPTQ is SOTA one-shot weight quantization method
 
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
 
+**There is a [pytorch branch](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/pytorch) that allows you to use `groupsize` and `act-order` together.**
+
 ## New Features
 Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
 
