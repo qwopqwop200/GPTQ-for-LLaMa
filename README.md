@@ -1,4 +1,4 @@
-# GPTQ-for-LLaMa
+# GPTQ-for-LLaMA
 4 bits quantization of [LLaMa](https://arxiv.org/abs/2302.13971) using [GPTQ](https://arxiv.org/abs/2210.17323)
 
 GPTQ is SOTA one-shot weight quantization method
@@ -16,9 +16,9 @@ Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab
 
 ## Result
 <details>
-<summary>LLaMa-7B(click me)</summary>
+<summary>LLaMA-7B(click me)</summary>
 
-| [LLaMa-7B](https://arxiv.org/abs/2302.13971)       | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
+| [LLaMA-7B](https://arxiv.org/abs/2302.13971)       | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
 | FP16                                               |  16  |     -      |    13940    |    5.68   |         12.5        |
 | RTN                                                |  4   |     -      |      -      |    6.29   |          -          |
@@ -30,9 +30,9 @@ Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab
 </details>
 
 <details>
-<summary>LLaMa-13B</summary>
+<summary>LLaMA-13B</summary>
 
-| [LLaMa-13B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
+| [LLaMA-13B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
 | FP16                                               |  16  |     -      |     OOM     |    5.09   |         24.2        |
 | RTN                                                |  4   |     -      |      -      |    5.53   |          -          |
@@ -44,7 +44,7 @@ Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab
 </details>
 
 <details>
-<summary>LLaMa-33B</summary>
+<summary>LLaMA-33B</summary>
 
 | [LLaMa-33B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
@@ -58,9 +58,9 @@ Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab
 </details>
 
 <details>
-<summary>LLaMa-65B</summary>
+<summary>LLaMA-65B</summary>
 
-| [LLaMa-65B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
+| [LLaMA-65B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
 | FP16                                               |  16  |     -      |     OOM     |    3.53   |         121.0       |
 | RTN                                                |  4   |     -      |      -      |    3.92   |          -          |
@@ -86,7 +86,7 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvi
 # pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
 
 git clone https://github.com/qwopqwop200/GPTQ-for-LLaMa
-cd GPTQ-for-LLaMa
+cd GPTQ-for-LLaMA
 pip install -r requirements.txt
 python setup_cuda.py install
 
@@ -104,13 +104,13 @@ CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 All experiments were run on a single NVIDIA RTX3090.
 
 # Language Generation
-## LLaMa
+## LLaMA
 
 ```
-#convert LLaMa to hf
+#convert LLaMA to hf
 python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir ./llama-hf
 
-# Benchmark language generation with 4-bit LLaMa-7B:
+# Benchmark language generation with 4-bit LLaMA-7B:
 
 # Save compressed model
 CUDA_VISIBLE_DEVICES=0 python llama.py ./llama-hf/llama-7b c4 --wbits 4 --true-sequential --act-order --save llama7b-4bit.pt
@@ -134,4 +134,4 @@ Basically, 4-bit quantization and 128 groupsize are recommended.
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
 
-Thanks to Meta AI for releasing [LLaMa](https://arxiv.org/abs/2302.13971), a powerful LLM.
+Thanks to Meta AI for releasing [LLaMA](https://arxiv.org/abs/2302.13971), a powerful LLM.
