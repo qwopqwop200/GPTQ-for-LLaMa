@@ -153,6 +153,9 @@ class QuantLinear(nn.Module):
             self.register_buffer('bias', torch.zeros(outfeatures))
         else:
             self.bias = None
+        
+        g_idx = [i // groupsize  for i in range(infeatures)]
+        self.register_buffer('g_idx', torch.tensor(g_idx, dtype = torch.int32))
         self.register_buffer('qweight', torch.zeros((infeatures // 32 * bits, outfeatures), dtype=torch.int))
         
         # is performed by unpacking the weights and using torch.matmul
@@ -163,18 +166,18 @@ class QuantLinear(nn.Module):
                                                      [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
                                                      [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],], dtype=torch.int32).reshape(1,3,12), persistent=False)
                 
-    def pack(self, linear, scales, zeros):
+    def pack(self, linear, scales, zeros, g_idx):
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
         scale_zeros = zeros * scales
         self.scales = scales.clone()
+        self.g_idx = g_idx.clone()
         if linear.bias is not None:
             self.bias = linear.bias.clone() 
             
         intweight = []
         for idx in range(self.infeatures):
-            g_idx = idx // self.groupsize
-            intweight.append(torch.round((linear.weight.data[:,idx] + scale_zeros[g_idx]) / self.scales[g_idx]).to(torch.int)[:,None])
+            intweight.append(torch.round((linear.weight.data[:,idx] + scale_zeros[g_idx[idx]]) / self.scales[g_idx[idx]]).to(torch.int)[:,None])
         intweight = torch.cat(intweight,dim=1)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
@@ -270,23 +273,19 @@ class QuantLinear(nn.Module):
             zeros[:,:,0,10] = (zeros[:,:,0,10]&0x3) | ((zeros[:,:,1,0] << 2)&0x4)
             zeros[:,:,1,11] = (zeros[:,:,1,11]&0x1) | ((zeros[:,:,2,0] << 1)&0x6)
             zeros = zeros & 0x7
-            zeros = torch.cat([zeros[:,:,0,:11], zeros[:,:,1,1:12]
-            , zeros[:,:,2,1:11]], dim=2)
+            zeros = torch.cat([zeros[:,:,0,:11], zeros[:,:,1,1:12], zeros[:,:,2,1:11]], dim=2)
         else:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
-        weight = weight.reshape(-1, self.groupsize, weight.shape[2])
-
+        weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
+        
         zeros = zeros + 1
-        zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
-          
+        zeros = zeros.reshape(zeros.shape[0], zeros.shape[1] * zeros.shape[2])
+        
         scales = self.scales
-        scales = scales.reshape(-1, 1, scales.shape[-1])
-                
-        weights = (scales * (weight - zeros))
-        weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
+        weights = (scales[self.g_idx] * (weight - zeros[self.g_idx]))
         x = torch.matmul(x, weights.to(x.dtype))  
-                
+
         x = x + self.bias if self.bias is not None else x
         return x
 
