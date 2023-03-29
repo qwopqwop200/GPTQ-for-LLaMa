@@ -81,9 +81,9 @@ def opt_sequential(model, dataloader, dev):
         if args.true_sequential:
             sequential = [
                 ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
-                ['self_attn.o_proj'],
-                ['mlp.up_proj', 'mlp.gate_proj'],
-                ['mlp.down_proj']
+                ['self_attn.out_proj'],
+                ['fc1'],
+                ['fc2']
             ]
         else:
             sequential = [list(full.keys())]
