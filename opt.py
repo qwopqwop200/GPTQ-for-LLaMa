@@ -78,15 +78,7 @@ def opt_sequential(model, dataloader, dev):
         layer = layers[i].to(dev)
         
         full = find_layers(layer)
-        if args.true_sequential:
-            sequential = [
-                ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
-                ['self_attn.o_proj'],
-                ['mlp.up_proj', 'mlp.gate_proj'],
-                ['mlp.down_proj']
-            ]
-        else:
-            sequential = [list(full.keys())]
+        sequential = [list(full.keys())]
        
         for names in sequential:
             subset = {n: full[n] for n in names}
@@ -440,10 +432,6 @@ if __name__ == '__main__':
     parser.add_argument(
         '--act-order', action='store_true',
         help='Whether to apply the activation order GPTQ heuristic'
-    )
-    parser.add_argument(
-        '--true-sequential', action='store_true',
-        help='Whether to run in true sequential model.'
     )
     parser.add_argument(
         '--new-eval', action='store_true',
