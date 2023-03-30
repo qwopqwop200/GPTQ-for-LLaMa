@@ -245,7 +245,7 @@ def make_quant(module, names, bits, groupsize, name=''):
         name1 = name + '.' + attr if name != '' else attr
         if name1 in names:
             delattr(module, attr)
-            setattr(module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias))
+            setattr(module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias is not None))
     for name1, child in module.named_children():
         make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
 
@@ -259,7 +259,7 @@ class QuantLinear(nn.Module):
         self.bits = bits
         self.groupsize = groupsize if groupsize != -1 else infeatures
         self.maxq = 2 ** self.bits - 1
-        
+
         self.register_buffer('qweight', torch.zeros((infeatures // 32 * self.bits, outfeatures), dtype=torch.int32))
         self.register_buffer('qzeros', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures // 32 * self.bits), dtype=torch.int32))
         self.register_buffer('scales', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures), dtype=torch.float16))
@@ -370,7 +370,7 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros) 
         
     def forward(self, x):
-        out_shape = (x.shape[0], x.shape[1], self.outfeatures)
+        out_shape = x.shape[:-1] + (self.outfeatures, )
         x = x.reshape(-1,x.shape[-1])
         if self.bits in [2,4,8]:
             zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits), self.wf.unsqueeze(0)).to(torch.int16 if self.bits == 8 else torch.int8)
@@ -400,7 +400,6 @@ class QuantLinear(nn.Module):
                 if self.is_cuda is True and (self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold):
                     zeros = self.scales * zeros
                     out = torch.zeros((x.shape[0], self.outfeatures), device='cuda', dtype=torch.float32)
-                    print(self.scales.float().shape)
                     quant_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), zeros.float(), self.g_idx)
                     out = out.half()
                 else:
