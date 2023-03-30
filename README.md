@@ -10,6 +10,11 @@ Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab
 * Slightly adjusted preprocessing of C4 and PTB for more realistic evaluations (used in our updated results); can be activated via the flag --new-eval.
 * two new tricks:--act-order (quantizing columns in order of decreasing activation size) and --true-sequential (performing sequential quantization even within a single Transformer block). Those fix GPTQ's strangely bad performance on the 7B model (from 7.15 to 6.09 Wiki2 PPL) and lead to slight improvements on most models/settings in general. 
 
+I changed the code to use [triton](https://github.com/openai/triton) now.
+It works without triton, but using triton is recommended.
+Due to triton's limitation, 3bit could not be implemented.
+Triton only supports Linux, so if you are a Windows user, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
+
 ## Result
 <details>
 <summary>LLaMA-7B(click me)</summary>
