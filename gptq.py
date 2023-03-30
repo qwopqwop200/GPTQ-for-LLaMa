@@ -146,6 +146,7 @@ class GPTQ:
         print('time %.2f' % (time.time() - tick))
         print('error', torch.sum(Losses).item())
         
+        groupsize = groupsize if groupsize != -1 else self.columns
         g_idx = [i // groupsize  for i in range(self.columns)]
         g_idx = torch.tensor(g_idx, dtype=torch.int32, device=Q.device)
         if actorder:
