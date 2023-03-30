@@ -5,10 +5,6 @@ GPTQ is SOTA one-shot weight quantization method
 
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
 
-## New Features
-**Changed to use only pytorch instead of the current cuda kernel.
-It has no impact on memory usage. There is a slowdown below 128 length(If you use Transformers' use_cache, length is effectively close to 1.), but much faster at 128 and above.**
-
 Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab/gptq#new-features).
 
 * Slightly adjusted preprocessing of C4 and PTB for more realistic evaluations (used in our updated results); can be activated via the flag --new-eval.
@@ -88,6 +84,10 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvi
 git clone https://github.com/qwopqwop200/GPTQ-for-LLaMa
 cd GPTQ-for-LLaMa
 pip install -r requirements.txt
+python setup_cuda.py install
+
+# Benchmark performance for FC2 layer of LLaMa-7B
+CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 ```
 ## Dependencies
 
