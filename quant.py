@@ -220,7 +220,7 @@ try:
             b = b * scales - zeros  # Scale and shift
 
             accumulator += tl.dot(a, b)
-            a_ptrs += BLOCK_SIZE_K * stride_ak
+            a_ptrs += BLOCK_SIZE_K
             b_ptrs += (BLOCK_SIZE_K // infearure_per_bits) * stride_bk
             g_ptrs += BLOCK_SIZE_K
 
