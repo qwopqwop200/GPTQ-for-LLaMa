@@ -50,7 +50,7 @@ Triton only supports Linux, so if you are a Windows user, please use [WSL2](http
 <details>
 <summary>LLaMA-33B</summary>
 
-| [LLaMa-33B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
+| [LLaMA-33B](https://arxiv.org/abs/2302.13971)      | Bits | group-size | memory(MiB) | Wikitext2 | checkpoint size(GB) |
 | -------------------------------------------------- | ---- | ---------- | ----------- | --------- | ------------------- |
 | FP16                                               |  16  |     -      |     OOM     |    4.10   |         60.5        |
 | RTN                                                |  4   |     -      |      -      |    4.54   |          -          |
