@@ -23,7 +23,7 @@ def get_llama(model):
     model.seqlen = 2048
     return model
 
-def load_quant(model, checkpoint, wbits, groupsize):
+def load_quant(model, checkpoint, wbits, groupsize, device):
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -47,9 +47,11 @@ def load_quant(model, checkpoint, wbits, groupsize):
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
         from safetensors.torch import load_file as safe_load
-        model.load_state_dict(safe_load(checkpoint), strict = False)
+        if device == -1:
+            device = "cpu"
+        model.load_state_dict(safe_load(checkpoint, device))
     else:
-        model.load_state_dict(torch.load(checkpoint), strict = False)
+        model.load_state_dict(torch.load(checkpoint))
     model.seqlen = 2048
     print('Done.')
 
@@ -102,14 +104,19 @@ if __name__ == '__main__':
         '--temperature', type=float, default=0.8,
         help='The value used to module the next token probabilities.'
     )
-    
+
+    parser.add_argument(
+        '--device', type=int, default=-1,
+        help='The device used to load the model when using safetensors. Default device is "cpu" or specify, 0,1,2,3,... for GPU device.'
+    )
+
     args = parser.parse_args()
 
     if type(args.load) is not str:
         args.load = args.load.as_posix()
     
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize, args.device)
     else:
         model = get_llama(args.model)
         model.eval()
