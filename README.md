@@ -55,6 +55,7 @@ Triton only supports Linux, so if you are a Windows user, please use [WSL2](http
 | FP16                                               |  16  |     -      |     OOM     |    4.10   |         60.5        |
 | RTN                                                |  4   |     -      |      -      |    4.54   |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |    19493    |    4.45   |         15.7        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |      -      |    4.23   |         16.3        |
 | RTN                                                |  3   |     -      |      -      |   14.89   |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |    15493    |    5.69   |         12.0        |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |    16566    |    4.80   |         13.0        |
@@ -69,6 +70,7 @@ Triton only supports Linux, so if you are a Windows user, please use [WSL2](http
 | FP16                                               |  16  |     -      |     OOM     |    3.53   |         121.0       |
 | RTN                                                |  4   |     -      |      -      |    3.92   |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     OOM     |    3.84   |         31.1        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     OOM     |    3.65   |          -          |
 | RTN                                                |  3   |     -      |      -      |   10.59   |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     OOM     |    5.04   |         23.6        |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     OOM     |    4.17   |         25.6        |
