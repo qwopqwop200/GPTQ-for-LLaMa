@@ -200,24 +200,30 @@ try:
         g_ptrs = g_ptr + offs_k
         # shifter is used to extract the N bits of each element in the 32-bit word from B
         scales_ptrs = scales_ptr + offs_bn[None, :]
-        zeros_ptrs = zeros_ptr + offs_bn[None, :]
+        zeros_ptrs = zeros_ptr + (offs_bn[None, :]// infearure_per_bits) 
         
         shifter = (offs_k % infearure_per_bits) * bits
+        zeros_shifter = (offs_bn % infearure_per_bits) * bits
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
         
+        debug = tl.arange(0, 2)
+        
         for k in range(0, num_pid_k):
-            g_idx = tl.load(g_ptrs)[:, None] * stride_scales
+            g_idx = tl.load(g_ptrs)
 
             # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
-            scales = tl.load(scales_ptrs + g_idx)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-            zeros = tl.load(zeros_ptrs + g_idx)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-        
+            scales = tl.load(scales_ptrs + g_idx[:, None] * stride_scales)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            zeros = tl.load(zeros_ptrs + g_idx[:, None] * stride_zeros)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            
+            zeros = (zeros >> zeros_shifter[None, :]) & maxq
+            zeros = (zeros + 1)
+            
             a = tl.load(a_ptrs, mask=a_mask, other=0.)   # (BLOCK_SIZE_M, BLOCK_SIZE_K)
             b = tl.load(b_ptrs)   # (BLOCK_SIZE_K, BLOCK_SIZE_N), but repeated
 
             # Now we need to unpack b (which is N-bit values) into 32-bit values
             b = (b >> shifter[:, None]) & maxq  # Extract the N-bit values
-            b = b * scales - zeros  # Scale and shift
+            b = (b - zeros) * scales  # Scale and shift
 
             accumulator += tl.dot(a, b)
             a_ptrs += BLOCK_SIZE_K
@@ -370,38 +376,34 @@ class QuantLinear(nn.Module):
         
     def forward(self, x):
         out_shape = x.shape[:-1] + (self.outfeatures, )
-        x = x.reshape(-1,x.shape[-1])
-        if self.bits in [2,4,8]:
-            zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits), self.wf.unsqueeze(0)).to(torch.int16 if self.bits == 8 else torch.int8)
-            torch.bitwise_and(zeros, (2 ** self.bits) - 1, out=zeros)
-        elif self.bits == 3:
-            zeros = self.qzeros.reshape(self.qzeros.shape[0], self.qzeros.shape[1]//3, 3, 1).expand(-1, -1, -1, 12)
-            zeros = (zeros >> self.wf.unsqueeze(0))
-            zeros[:,:,0,10] = (zeros[:,:,0,10]&0x3) | ((zeros[:,:,1,0] << 2)&0x4)
-            zeros[:,:,1,11] = (zeros[:,:,1,11]&0x1) | ((zeros[:,:,2,0] << 1)&0x6)
-            zeros = zeros & 0x7
-            zeros = torch.cat([zeros[:,:,0,:11], zeros[:,:,1,1:12], zeros[:,:,2,1:11]], dim=2)
-        zeros = zeros + 1
-        zeros = zeros.reshape(self.scales.shape)        
+        x = x.reshape(-1,x.shape[-1])     
         if self.is_trioton:
             if self.bits in [2,4,8]:
-                zeros = self.scales * zeros
                 out = torch.empty((x.shape[0], self.outfeatures), device='cuda', dtype=torch.float16)
                 grid = lambda META: (triton.cdiv(x.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(self.outfeatures, META['BLOCK_SIZE_N']),)
                 matmul_248_kernel[grid](x, self.qweight, out,
-                                        self.scales, zeros, self.g_idx,
+                                        self.scales, self.qzeros, self.g_idx,
                                         x.shape[0], self.outfeatures, self.infeatures, self.bits, self.maxq,
                                         x.stride(0), x.stride(1),
                                         self.qweight.stride(0), self.qweight.stride(1),
                                         out.stride(0), out.stride(1),
-                                        self.scales.stride(0), zeros.stride(0),) 
+                                        self.scales.stride(0), self.qzeros.stride(0)) 
             elif self.bits == 3:
                 if self.is_cuda is True and (self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold):
-                    zeros = self.scales * zeros
                     out = torch.zeros((x.shape[0], self.outfeatures), device='cuda', dtype=torch.float32)
-                    quant_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), zeros.float(), self.g_idx)
+                    quant_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
                     out = out.half()
                 else:
+                    zeros = self.qzeros.reshape(self.qzeros.shape[0], self.qzeros.shape[1]//3, 3, 1).expand(-1, -1, -1, 12)
+                    zeros = (zeros >> self.wf.unsqueeze(0))
+                    zeros[:,:,0,10] = (zeros[:,:,0,10]&0x3) | ((zeros[:,:,1,0] << 2)&0x4)
+                    zeros[:,:,1,11] = (zeros[:,:,1,11]&0x1) | ((zeros[:,:,2,0] << 1)&0x6)
+                    zeros = zeros & 0x7
+                    zeros = torch.cat([zeros[:,:,0,:11], zeros[:,:,1,1:12], zeros[:,:,2,1:11]], dim=2)
+                
+                    zeros = zeros + 1
+                    zeros = zeros.reshape(self.scales.shape)
+                    
                     weight = self.qweight.reshape(self.qweight.shape[0]//3, 3, 1, self.qweight.shape[1]).expand(-1, -1, 12, -1)
                     weight = (weight >> self.wf.unsqueeze(-1))&0x7
                     weight[:,0,10] = (weight[:,0,10]&0x3) | ((weight[:,1,0] << 2)&0x4)
@@ -415,22 +417,37 @@ class QuantLinear(nn.Module):
                     out = torch.matmul(x.half(), weights)
         else:
             if  self.is_cuda is True and (self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold):
-                zeros = self.scales * zeros
                 out = torch.zeros((x.shape[0], self.outfeatures), device='cuda', dtype=torch.float32)
                 if self.bits == 2:
-                    quant_cuda.vecquant2matmul(x.float(), self.qweight, out, self.scales.float(), zeros.float(), self.g_idx)
+                    quant_cuda.vecquant2matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
                 elif self.bits == 3:
-                    quant_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), zeros.float(), self.g_idx)
+                    quant_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
                 elif self.bits == 4:
-                    quant_cuda.vecquant4matmul(x.float(), self.qweight, out, self.scales.float(), zeros.float(), self.g_idx)
+                    quant_cuda.vecquant4matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
                 elif self.bits == 8:
-                    quant_cuda.vecquant8matmul(x.float(), self.qweight, out, self.scales.float(), zeros.float(), self.g_idx)
+                    quant_cuda.vecquant8matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
                 out = out.half()
             else:
                 if self.bits in [2,4,8]:
+                    zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits), self.wf.unsqueeze(0)).to(torch.int16 if self.bits == 8 else torch.int8)
+                    torch.bitwise_and(zeros, (2 ** self.bits) - 1, out=zeros)
+                    
+                    zeros = zeros + 1
+                    zeros = zeros.reshape(self.scales.shape)   
+                            
                     weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 32 // self.bits, -1), self.wf.unsqueeze(-1)).to(torch.int16 if self.bits == 8 else torch.int8)
                     torch.bitwise_and(weight,(2 ** self.bits) - 1, out=weight)
                 elif self.bits == 3:
+                    zeros = self.qzeros.reshape(self.qzeros.shape[0], self.qzeros.shape[1]//3, 3, 1).expand(-1, -1, -1, 12)
+                    zeros = (zeros >> self.wf.unsqueeze(0))
+                    zeros[:,:,0,10] = (zeros[:,:,0,10]&0x3) | ((zeros[:,:,1,0] << 2)&0x4)
+                    zeros[:,:,1,11] = (zeros[:,:,1,11]&0x1) | ((zeros[:,:,2,0] << 1)&0x6)
+                    zeros = zeros & 0x7
+                    zeros = torch.cat([zeros[:,:,0,:11], zeros[:,:,1,1:12], zeros[:,:,2,1:11]], dim=2)
+                
+                    zeros = zeros + 1
+                    zeros = zeros.reshape(self.scales.shape)  
+                
                     weight = self.qweight.reshape(self.qweight.shape[0]//3, 3, 1, self.qweight.shape[1]).expand(-1, -1, 12, -1)
                     weight = (weight >> self.wf.unsqueeze(-1))&0x7
                     weight[:,0,10] = (weight[:,0,10]&0x3) | ((weight[:,1,0] << 2)&0x4)
