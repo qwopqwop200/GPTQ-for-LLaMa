@@ -12,7 +12,7 @@ print('Benchmarking LLaMa-7B FC2 matvec ...')
 
 DEV = torch.device('cuda:0')
 
-B = 2
+B = 4
 L = 512
 M = 4096
 N = 11008
@@ -35,9 +35,9 @@ mat = mat.to(DTYPE)
 vec = vec.to(DTYPE)
 mul = mul.to(DTYPE)
 
-mat = torch.randint(-1000000000, 1000000000, (M // 32 * 3, N), device=DEV, dtype=torch.int)
+mat = torch.randint(-1000000000, 1000000000, (M // 32 * 2, N), device=DEV, dtype=torch.int)
 scales = torch.randn(N, device=DEV, dtype=DTYPE)
-zeros = torch.randint(-1000000000, 1000000000,(1,N // 32 * 3), device=DEV,dtype=torch.int32)
+zeros = torch.randint(-1000000000, 1000000000,(1,N // 32 * 2), device=DEV,dtype=torch.int32)
 g_idx = torch.zeros(M, device=DEV, dtype=torch.int32)
 COUNT = 1000
 import time
@@ -48,6 +48,10 @@ for _ in range(COUNT):
     torch.cuda.synchronize()
 print('2bit:', (time.time() - tick) / COUNT)
 
+mat = torch.randint(-1000000000, 1000000000, (M // 32 * 3, N), device=DEV, dtype=torch.int)
+scales = torch.randn(N, device=DEV, dtype=DTYPE)
+zeros = torch.randint(-1000000000, 1000000000,(1,N // 32 * 3), device=DEV,dtype=torch.int32)
+
 vec = vec.float()
 tick = time.time()
 for _ in range(COUNT):
@@ -55,12 +59,20 @@ for _ in range(COUNT):
     torch.cuda.synchronize()
 print('3bit:', (time.time() - tick) / COUNT)
 
+mat = torch.randint(-1000000000, 1000000000, (M // 32 * 4, N), device=DEV, dtype=torch.int)
+scales = torch.randn(N, device=DEV, dtype=DTYPE)
+zeros = torch.randint(-1000000000, 1000000000,(1,N // 32 * 4), device=DEV,dtype=torch.int32)
+
 vec = vec.float()
 tick = time.time()
 for _ in range(COUNT):
     quant_cuda.vecquant4matmul(vec, mat, mul, scales, zeros, g_idx)
     torch.cuda.synchronize()
 print('4bit:', (time.time() - tick) / COUNT)
+
+mat = torch.randint(-1000000000, 1000000000, (M // 32 * 8, N), device=DEV, dtype=torch.int)
+scales = torch.randn(N, device=DEV, dtype=DTYPE)
+zeros = torch.randint(-1000000000, 1000000000,(1,N // 32 * 8), device=DEV,dtype=torch.int32)
 
 vec = vec.float()
 tick = time.time()
