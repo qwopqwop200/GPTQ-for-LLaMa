@@ -111,8 +111,7 @@ def opt_sequential(model, dataloader, dev):
                 h.remove()
 
             for name in subset:
-                print(i, name)
-                print('Quantizing ...')
+                print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
                 scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
                 quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero,g_idx)
                 gptq[name].free()
