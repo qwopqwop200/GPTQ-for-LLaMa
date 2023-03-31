@@ -197,21 +197,20 @@ try:
         a_mask = (offs_am[:, None] < M)
         # b_ptrs is set up such that it repeats elements along the K axis 8 times
         b_ptrs = b_ptr + ((offs_k[:, None] // infearure_per_bits) * stride_bk + offs_bn[None, :] * stride_bn)   # (BLOCK_SIZE_K, BLOCK_SIZE_N)
-
+        g_ptrs = g_ptr + offs_k
         # shifter is used to extract the N bits of each element in the 32-bit word from B
+        scales_ptrs = scales_ptr + offs_bn[None, :]
+        zeros_ptrs = zeros_ptr + offs_bn[None, :]
+        
         shifter = (offs_k % infearure_per_bits) * bits
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
         
         for k in range(0, num_pid_k):
-            g_ptrs = g_ptr + offs_k + (BLOCK_SIZE_K * k)
             g_idx = tl.load(g_ptrs)
             
-            scales_ptrs = scales_ptr + (g_idx[:, None] * stride_scales) + offs_bn[None, :]
-            zeros_ptrs = zeros_ptr + (g_idx[:, None] *  stride_zeros) + offs_bn[None, :]
-
             # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
-            scales = tl.load(scales_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-            zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            scales = tl.load(scales_ptrs + g_idx[:, None] * stride_scales)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            zeros = tl.load(zeros_ptrs + g_idx[:, None] * stride_scales)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
         
             a = tl.load(a_ptrs, mask=a_mask, other=0.)   # (BLOCK_SIZE_M, BLOCK_SIZE_K)
             b = tl.load(b_ptrs)   # (BLOCK_SIZE_K, BLOCK_SIZE_N), but repeated
@@ -223,6 +222,7 @@ try:
             accumulator += tl.dot(a, b)
             a_ptrs += BLOCK_SIZE_K * stride_ak
             b_ptrs += (BLOCK_SIZE_K // infearure_per_bits) * stride_bk
+            g_ptrs += BLOCK_SIZE_K
 
         c = accumulator.to(tl.float16)
         
