@@ -472,15 +472,6 @@ if __name__ == '__main__':
         quantizers = opt_sequential(model, dataloader, DEV)
         print(time.time() - tick)
 
-    if args.save:
-        opt_pack(model, quantizers, args.wbits, args.groupsize)
-        torch.save(model.state_dict(), args.save) 
-
-    if args.save_safetensors:
-        opt_pack(model, quantizers, args.wbits, args.groupsize)
-        from safetensors.torch import save_file as safe_save
-        safe_save(model.state_dict(), args.save_safetensors)
-
     if args.benchmark:
         gpus = [torch.device('cuda:%d' % i) for i in range(torch.cuda.device_count())]
         if len(gpus) > 1:
@@ -502,3 +493,12 @@ if __name__ == '__main__':
         )
         print(dataset)
         opt_eval(model, testloader, DEV)
+
+    if args.save:
+        opt_pack(model, quantizers, args.wbits, args.groupsize)
+        torch.save(model.state_dict(), args.save) 
+
+    if args.save_safetensors:
+        opt_pack(model, quantizers, args.wbits, args.groupsize)
+        from safetensors.torch import save_file as safe_save
+        safe_save(model.state_dict(), args.save_safetensors)
