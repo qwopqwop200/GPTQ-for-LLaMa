@@ -206,11 +206,11 @@ try:
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
         
         for k in range(0, num_pid_k):
-            g_idx = tl.load(g_ptrs)
-            
+            g_idx = tl.load(g_ptrs)[:, None] * stride_scales
+
             # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
-            scales = tl.load(scales_ptrs + g_idx[:, None] * stride_scales)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-            zeros = tl.load(zeros_ptrs + g_idx[:, None] * stride_scales)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            scales = tl.load(scales_ptrs + g_idx)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            zeros = tl.load(zeros_ptrs + g_idx)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
         
             a = tl.load(a_ptrs, mask=a_mask, other=0.)   # (BLOCK_SIZE_M, BLOCK_SIZE_K)
             b = tl.load(b_ptrs)   # (BLOCK_SIZE_K, BLOCK_SIZE_N), but repeated
