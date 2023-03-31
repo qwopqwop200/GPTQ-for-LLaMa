@@ -143,4 +143,4 @@ This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
 
 Thanks to Meta AI for releasing [LLaMA](https://arxiv.org/abs/2302.13971), a powerful LLM.
 
-Triton GPTQ kernel code is based on [GPTQ-triton](https://github.com/IST-DASLab/gptq](https://github.com/fpgaminer/GPTQ-triton)
+Triton GPTQ kernel code is based on [GPTQ-triton](https://github.com/fpgaminer/GPTQ-triton)
