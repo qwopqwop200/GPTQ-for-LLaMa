@@ -37,7 +37,7 @@ mul = mul.to(DTYPE)
 
 mat = torch.randint(-1000000000, 1000000000, (M // 32 * 3, N), device=DEV, dtype=torch.int)
 scales = torch.randn(N, device=DEV, dtype=DTYPE)
-zeros = torch.randn(N, device=DEV, dtype=DTYPE)
+zeros = torch.randint(-1000000000, 1000000000,(1,N // 32 * 3), device=DEV,dtype=torch.int32)
 g_idx = torch.zeros(M, device=DEV, dtype=torch.int32)
 COUNT = 1000
 import time
