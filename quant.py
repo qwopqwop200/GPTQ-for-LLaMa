@@ -193,7 +193,6 @@ try:
         offs_am = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
         offs_bn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
         offs_k = tl.arange(0, BLOCK_SIZE_K)
-        offs_gk = pid_n * BLOCK_SIZE_N + offs_k
         a_ptrs = a_ptr + (offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak)   # (BLOCK_SIZE_M, BLOCK_SIZE_K)
         a_mask = (offs_am[:, None] < M)
         # b_ptrs is set up such that it repeats elements along the K axis 8 times
