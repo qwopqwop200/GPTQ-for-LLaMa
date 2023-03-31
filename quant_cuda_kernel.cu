@@ -36,12 +36,13 @@ __global__ void VecQuant2MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
+    const  		int* __restrict__ zeros,
 	const  	    int* __restrict__ g_idx,
     int batch,
     int vec_height, 	
     int height,
-    int width
+    int width,
+	int zero_width
 );
 
 template <typename scalar_t>
@@ -50,12 +51,13 @@ __global__ void VecQuant3MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
+    const  		int* __restrict__ zeros,
 	const  	    int* __restrict__ g_idx,
     int batch,
     int vec_height, 	
     int height,
-    int width
+    int width,
+	int zero_width
 );
 
 template <typename scalar_t>
@@ -64,12 +66,13 @@ __global__ void VecQuant4MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
+    const  		int* __restrict__ zeros,
 	const  	    int* __restrict__ g_idx,
     int batch,
     int vec_height, 	
     int height,
-    int width
+    int width,
+	int zero_width
 );
 
 template <typename scalar_t>
@@ -78,12 +81,13 @@ __global__ void VecQuant8MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
+    const  		int* __restrict__ zeros,
 	const  	    int* __restrict__ g_idx,
     int batch,
     int vec_height, 	
     int height,
-    int width
+    int width,
+	int zero_width
 );
 
 const int BLOCKWIDTH  = 256;
@@ -113,6 +117,7 @@ void vecquant2matmul_cuda(
   int vec_height = vec.size(1);
   int height = mat.size(0);
   int width = mat.size(1);
+  int zero_width = zeros.size(1);
 
   dim3 blocks(
     (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2,
@@ -124,8 +129,8 @@ void vecquant2matmul_cuda(
     vec.type(), "vecquant2matmul_cuda", ([&] {
       VecQuant2MatMulKernel<<<blocks, threads>>>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
-        scales.data<scalar_t>(), zeros.data<scalar_t>(), g_idx.data<int>(), 
-        batch, vec_height, height, width
+        scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(), 
+        batch, vec_height, height, width, zero_width
       );
     })
   );
@@ -137,12 +142,13 @@ __global__ void VecQuant2MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
+    const  		int* __restrict__ zeros,
     const   	int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
-    int width
+    int width,
+	int zero_width
 ) {
   int h = BLOCKHEIGHT2 * blockIdx.x;
   int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
@@ -154,6 +160,9 @@ __global__ void VecQuant2MatMulKernel(
   unsigned int g;
   scalar_t w_tmp;
   
+  int z_w = w / 16; 
+  int z_mod = (w % 16) * 2;
+  
   float weight[BLOCKWIDTH];
   
   for (k = 0; k <  BLOCKWIDTH; ++k){	
@@ -162,11 +171,11 @@ __global__ void VecQuant2MatMulKernel(
 	
     g = as_int(g_idx[g_h + k]);
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = zeros[g * width + w];
+    scalar_t zero = scalar_t((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod & 0x3) + 1);
 	
     w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0x3);
     
-	weight[k] = (scale * w_tmp - zero);
+	weight[k] = scale * (w_tmp - zero);
   }
 
   scalar_t res;
@@ -194,6 +203,7 @@ void vecquant3matmul_cuda(
   int vec_height = vec.size(1);
   int height = mat.size(0);
   int width = mat.size(1);
+  int zero_width = zeros.size(1);
 
   dim3 blocks(
     (height + BLOCKHEIGHT3 - 1) / BLOCKHEIGHT3,
@@ -205,8 +215,8 @@ void vecquant3matmul_cuda(
     vec.type(), "vecquant3matmul_cuda", ([&] {
       VecQuant3MatMulKernel<<<blocks, threads>>>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
-        scales.data<scalar_t>(), zeros.data<scalar_t>(), g_idx.data<int>(), 
-        batch, vec_height, height, width
+        scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(), 
+        batch, vec_height, height, width, zero_width
       );
     })
   );
@@ -218,12 +228,13 @@ __global__ void VecQuant3MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
+    const       int* __restrict__ zeros,
     const   	int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
-    int width
+    int width,
+	int zero_width
 ) {
   int h = BLOCKHEIGHT3 * blockIdx.x;
   int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
@@ -234,6 +245,31 @@ __global__ void VecQuant3MatMulKernel(
   int k;
   unsigned int g;
   scalar_t w_tmp;
+  
+  int z_w = (w / 32) * 3; 
+  int z_mod = w % 32;
+  int z_bit;
+  unsigned int z_tmp;
+  if (z_mod != 10){
+    if (z_mod != 21){
+      z_bit = z_mod;
+      if (z_bit > 21){
+        z_bit -= 22;
+        z_bit *= 3;
+        z_bit += 2;
+        z_w += 2;
+      } else if (z_bit > 10){
+        z_bit -= 11;
+        z_bit *= 3;
+        z_bit += 1;
+        z_w += 1;
+      } else {
+        z_bit *= 3;
+      }
+    } else {
+      z_w += 1;
+    }
+  }
   
   float weight[BLOCKWIDTH];
   
@@ -265,7 +301,16 @@ __global__ void VecQuant3MatMulKernel(
 	
     g = as_int(g_idx[g_h + k]);
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = zeros[g * width + w];
+    scalar_t zero;
+    if (z_mod == 10) {
+      z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 30) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 2) & 0x4);
+      zero = scalar_t((z_tmp) + 1);
+    } else if (z_mod == 21){
+      z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 31) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 1) & 0x6);
+      zero = scalar_t((z_tmp) + 1);
+    } else {
+      zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1);
+    }
 	
     if (k_mod == 10) {
       w_tmp = (as_unsigned(mat[i + (k_w * width)]) >> 30) | ((as_unsigned(mat[i + ((k_w + 1)* width)]) << 2) & 0x4);
@@ -274,7 +319,7 @@ __global__ void VecQuant3MatMulKernel(
     } else {
       w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0x7);
     }
-	weight[k] = (scale * w_tmp - zero);
+	weight[k] = scale * (w_tmp - zero);
   }
 
   scalar_t res;
@@ -302,6 +347,7 @@ void vecquant4matmul_cuda(
   int vec_height = vec.size(1);
   int height = mat.size(0);
   int width = mat.size(1);
+  int zero_width = zeros.size(1);
 
   dim3 blocks(
     (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4,
@@ -313,8 +359,8 @@ void vecquant4matmul_cuda(
     vec.type(), "vecquant4matmul_cuda", ([&] {
       VecQuant4MatMulKernel<<<blocks, threads>>>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
-        scales.data<scalar_t>(), zeros.data<scalar_t>(), g_idx.data<int>(), 
-        batch, vec_height, height, width
+        scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(), 
+        batch, vec_height, height, width, zero_width
       );
     })
   );
@@ -326,12 +372,13 @@ __global__ void VecQuant4MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
+    const       int* __restrict__ zeros,
     const   	int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
-    int width
+    int width,
+	int zero_width
 ) {
   int h = BLOCKHEIGHT4 * blockIdx.x;
   int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
@@ -343,6 +390,10 @@ __global__ void VecQuant4MatMulKernel(
   unsigned int g;
   scalar_t w_tmp;
   
+
+  int z_w = w / 8; 
+  int z_mod = (w % 8) * 4;
+  
   float weight[BLOCKWIDTH];
   
   for (k = 0; k <  BLOCKWIDTH; ++k){	
@@ -351,11 +402,11 @@ __global__ void VecQuant4MatMulKernel(
 	
     g = as_int(g_idx[g_h + k]);
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = zeros[g * width + w];
+    scalar_t zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1);
 	
     w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0xF);
     
-	weight[k] = (scale * w_tmp - zero);
+	weight[k] = scale * (w_tmp - zero);
   }
 
   scalar_t res;
@@ -383,6 +434,7 @@ void vecquant8matmul_cuda(
   int vec_height = vec.size(1);
   int height = mat.size(0);
   int width = mat.size(1);
+  int zero_width = zeros.size(1);
 
   dim3 blocks(
     (height + BLOCKHEIGHT8 - 1) / BLOCKHEIGHT8,
@@ -394,8 +446,8 @@ void vecquant8matmul_cuda(
     vec.type(), "vecquant8matmul_cuda", ([&] {
       VecQuant8MatMulKernel<<<blocks, threads>>>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
-        scales.data<scalar_t>(), zeros.data<scalar_t>(), g_idx.data<int>(), 
-        batch, vec_height, height, width
+        scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(), 
+        batch, vec_height, height, width, zero_width
       );
     })
   );
@@ -407,12 +459,13 @@ __global__ void VecQuant8MatMulKernel(
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  scalar_t* __restrict__ zeros,
+    const       int* __restrict__ zeros,
     const   	int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
-    int width
+    int width,
+	int zero_width
 ) {
   int h = BLOCKHEIGHT8 * blockIdx.x;
   int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
@@ -424,6 +477,9 @@ __global__ void VecQuant8MatMulKernel(
   unsigned int g;
   scalar_t w_tmp;
   
+  int z_w = w / 4; 
+  int z_mod = (w % 4) * 8;
+  
   float weight[BLOCKWIDTH];
   
   for (k = 0; k <  BLOCKWIDTH; ++k){	
@@ -432,11 +488,11 @@ __global__ void VecQuant8MatMulKernel(
 	
     g = as_int(g_idx[g_h + k]);
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = zeros[g * width + w];
+    scalar_t zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xFF) + 1);
 	
     w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0xFF);
     
-	weight[k] = (scale * w_tmp - zero);
+	weight[k] = scale * (w_tmp - zero);
   }
 
   scalar_t res;
