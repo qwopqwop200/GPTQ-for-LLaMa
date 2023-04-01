@@ -77,45 +77,34 @@ def opt_sequential(model, dataloader, dev):
     for i in range(len(layers)):
         layer = layers[i].to(dev)
         
-        full = find_layers(layer)
-        if args.true_sequential:
-            sequential = [
-                ['self_attn.k_proj', 'self_attn.v_proj', 'self_attn.q_proj'],
-                ['self_attn.out_proj'],
-                ['fc1'],
-                ['fc2']
-            ]
-        else:
-            sequential = [list(full.keys())]
-       
-        for names in sequential:
-            subset = {n: full[n] for n in names}
-            gptq = {}
-            for name in subset:
-                gptq[name] = GPTQ(subset[name])
-                gptq[name].quantizer = Quantizer()
-                gptq[name].quantizer.configure(
-                    args.wbits, perchannel=True, sym=args.sym, mse=False
-                )
-                
-            def add_batch(name):
-                def tmp(_, inp, out):
-                    gptq[name].add_batch(inp[0].data, out.data)
-                return tmp
-            handles = []
-            for name in subset:
-                handles.append(subset[name].register_forward_hook(add_batch(name)))
-            for j in range(args.nsamples):
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
-            for h in handles:
-                h.remove()
-
-            for name in subset:
-                print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
-                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
-                quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero,g_idx)
-                gptq[name].free()
+        subset = find_layers(layer)	
+        gptq = {}	
+        for name in subset:	
+            gptq[name] = GPTQ(subset[name])	
+            gptq[name].quantizer = Quantizer()	
+            gptq[name].quantizer.configure(	args.wbits, perchannel=True, sym=args.sym, mse=False, trits=args.trits	)	
             
+        def add_batch(name):	
+            def tmp(_, inp, out):	
+                gptq[name].add_batch(inp[0].data, out.data)	
+            return tmp	
+            
+        handles = []	
+        for name in subset:	
+            handles.append(subset[name].register_forward_hook(add_batch(name)))	
+            
+        for j in range(args.nsamples):	
+            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]	
+            
+        for h in handles:	
+            h.remove()	
+            
+        for name in subset:	
+            print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
+            scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+            quantizers['model.decoder.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero,g_idx)
+            gptq[name].free()
+
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
 
@@ -194,7 +183,7 @@ def opt_eval(model, testenc, dev):
             for name in subset:
                 quantizer = Quantizer()
                 quantizer.configure(
-                    args.wbits, perchannel=True, sym=False, mse=False
+                    args.wbits, perchannel=True, sym=args.sym, mse=False
                 )
                 W = subset[name].weight.data
                 quantizer.find_params(W, weight=True)
@@ -278,9 +267,9 @@ def load_quant(model, checkpoint, wbits, groupsize):
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
         from safetensors.torch import load_file as safe_load
-        model.load_state_dict(safe_load(checkpoint), strict = False)
+        model.load_state_dict(safe_load(checkpoint))
     else:
-        model.load_state_dict(torch.load(checkpoint), strict = False)
+        model.load_state_dict(torch.load(checkpoint))
     model.seqlen = model.config.max_position_embeddings
     print('Done.')
     return model
@@ -413,6 +402,10 @@ if __name__ == '__main__':
         help='Groupsize to use for quantization; default uses full row.'
     )
     parser.add_argument(
+        '--eval', action='store_true',
+        help='evaluate quantized model.'
+    )
+    parser.add_argument(
         '--save', type=str, default='',
         help='Save quantized checkpoint under this name.'
     )
@@ -441,10 +434,6 @@ if __name__ == '__main__':
         help='Whether to apply the activation order GPTQ heuristic'
     )
     parser.add_argument(
-        '--true-sequential', action='store_true',
-        help='Whether to run in true sequential model.'
-    )
-    parser.add_argument(
         '--new-eval', action='store_true',
         help='Whether to use the new PTB and C4 eval'
     )
@@ -455,7 +444,7 @@ if __name__ == '__main__':
         args.load = args.load.as_posix()
     
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits, args.groupsize, args.faster_kernel)
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
     else:
         model = get_opt(args.model)
         model.eval()
@@ -481,15 +470,16 @@ if __name__ == '__main__':
     if args.load:
         exit()
 
-    datasets = ['wikitext2', 'ptb', 'c4'] 
-    if args.new_eval:
-      datasets = ['wikitext2', 'ptb-new', 'c4-new']
-    for dataset in datasets: 
-        dataloader, testloader = get_loaders(
-            dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
-        )
-        print(dataset)
-        opt_eval(model, testloader, DEV)
+    if args.eval:
+        datasets = ['wikitext2', 'ptb', 'c4'] 
+        if args.new_eval:
+          datasets = ['wikitext2', 'ptb-new', 'c4-new']
+        for dataset in datasets: 
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            print(dataset)
+            llama_eval(model, testloader, DEV)
 
     if args.save:
         opt_pack(model, quantizers, args.wbits, args.groupsize)
@@ -499,3 +489,4 @@ if __name__ == '__main__':
         opt_pack(model, quantizers, args.wbits, args.groupsize)
         from safetensors.torch import save_file as safe_save
         safe_save(model.state_dict(), args.save_safetensors)
+=
