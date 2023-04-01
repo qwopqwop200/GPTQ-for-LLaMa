@@ -10,7 +10,7 @@ Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab
 * Slightly adjusted preprocessing of C4 and PTB for more realistic evaluations (used in our updated results); can be activated via the flag --new-eval.
 * two new tricks:--act-order (quantizing columns in order of decreasing activation size) and --true-sequential (performing sequential quantization even within a single Transformer block). Those fix GPTQ's strangely bad performance on the 7B model (from 7.15 to 6.09 Wiki2 PPL) and lead to slight improvements on most models/settings in general. 
 
-I changed the code to use [triton](https://github.com/openai/triton) now. It works without triton, but using triton is recommended.
+I changed the code to use [triton](https://github.com/openai/triton) now.
 
 Due to triton's limitation, 3bit could not be implemented.
 
@@ -94,10 +94,6 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvi
 git clone https://github.com/qwopqwop200/GPTQ-for-LLaMa
 cd GPTQ-for-LLaMa
 pip install -r requirements.txt
-python setup_cuda.py install
-
-# Benchmark performance for FC2 layer of LLaMa-7B
-CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 ```
 ## Dependencies
 
@@ -105,7 +101,6 @@ CUDA_VISIBLE_DEVICES=0 python test_kernel.py
 * `transformers`: tested on v4.28.0.dev0
 * `datasets`: tested on v2.10.1
 * `safetensors`: tested on v0.3.0
-* (to run 4-bit kernels: setup for compiling PyTorch CUDA extensions, see also https://pytorch.org/tutorials/advanced/cpp_extension.html, tested on CUDA 11.7)
 
 All experiments were run on a single NVIDIA RTX3090.
 
