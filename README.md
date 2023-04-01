@@ -70,7 +70,7 @@ Triton only supports Linux, so if you are a Windows user, please use [WSL2](http
 | FP16                                               |  16  |     -      |     OOM     |    3.53   |         121.0       |
 | RTN                                                |  4   |     -      |      -      |    3.92   |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |     -      |     OOM     |    3.84   |         31.1        |
-| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     OOM     |    3.65   |         33.2        |
+| [GPTQ](https://arxiv.org/abs/2210.17323)           |  4   |    128     |     OOM     |    3.65   |         32.3        |
 | RTN                                                |  3   |     -      |      -      |   10.59   |          -          |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |     -      |     OOM     |    5.04   |         23.6        |
 | [GPTQ](https://arxiv.org/abs/2210.17323)           |  3   |    128     |     OOM     |    4.17   |         25.6        |
