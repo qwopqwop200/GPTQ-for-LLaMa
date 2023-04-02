@@ -451,17 +451,6 @@ if __name__ == '__main__':
         tick = time.time()
         quantizers = llama_sequential(model, dataloader, DEV)
         print(time.time() - tick)
-    
-    if args.eval:
-        datasets = ['wikitext2', 'ptb', 'c4'] 
-        if args.new_eval:
-          datasets = ['wikitext2', 'ptb-new', 'c4-new']
-        for dataset in datasets: 
-            dataloader, testloader = get_loaders(
-                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
-            )
-            print(dataset)
-            llama_eval(model, testloader, DEV)
         
     if args.benchmark:
         gpus = [torch.device('cuda:%d' % i) for i in range(torch.cuda.device_count())]
@@ -475,6 +464,17 @@ if __name__ == '__main__':
             
     if args.load:
         exit()
+        
+    if args.eval:
+        datasets = ['wikitext2', 'ptb', 'c4'] 
+        if args.new_eval:
+          datasets = ['wikitext2', 'ptb-new', 'c4-new']
+        for dataset in datasets: 
+            dataloader, testloader = get_loaders(
+                dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
+            )
+            print(dataset)
+            llama_eval(model, testloader, DEV)
 
     if args.save:
         llama_pack(model, quantizers, args.wbits, args.groupsize)
