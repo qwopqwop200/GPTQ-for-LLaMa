@@ -478,7 +478,7 @@ if __name__ == '__main__':
                 dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
             )
             print(dataset)
-            llama_eval(model, testloader, DEV)
+            opt_eval(model, testloader, DEV)
 
     if args.save:
         opt_pack(model, quantizers, args.wbits, args.groupsize)
