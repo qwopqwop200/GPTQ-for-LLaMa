@@ -466,6 +466,7 @@ if __name__ == '__main__':
         if args.benchmark:
             input_ids = next(iter(dataloader))[0][:, :args.benchmark]
             benchmark(model, input_ids, check=args.check)
+            
     if args.load:
         exit()
 
