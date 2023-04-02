@@ -106,7 +106,7 @@ def llama_sequential(model, dataloader, dev):
             for name in subset:
                 print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
                 scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
-                quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero,g_idx)
+                quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu())
                 gptq[name].free()
                 
         for j in range(args.nsamples):
@@ -228,7 +228,6 @@ def llama_pack(model, quantizers, wbits, groupsize):
     for name in qlayers:
         print(name)
         quantizers[name],scale,zero,g_idx = quantizers[name]
-        quantizers[name],scale,zero,g_idx = quantizers[name].cpu(),scale.cpu(),zero.cpu(),g_idx.cpu()
         qlayers[name].pack(layers[name], scale, zero, g_idx)
     print('Done.')
     return model
