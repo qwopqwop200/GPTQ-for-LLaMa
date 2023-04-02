@@ -102,7 +102,7 @@ def opt_sequential(model, dataloader, dev):
         for name in subset:	
             print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
             scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
-            quantizers['model.decoder.layers.%d.%s' % (i, name)] = (gptq[name].quantizer,scale,zero,g_idx)
+            quantizers['model.decoder.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu())
             gptq[name].free()
 
         for j in range(args.nsamples):
@@ -236,7 +236,6 @@ def opt_pack(model, quantizers, wbits, groupsize):
     for name in qlayers:
         print(name)
         quantizers[name],scale,zero,g_idx = quantizers[name]
-        quantizers[name],scale,zero,g_idx = quantizers[name].cpu(),scale.cpu(),zero.cpu(),g_idx.cpu()
         qlayers[name].pack(layers[name], scale, zero, g_idx)
     print('Done.')
     return model
@@ -489,4 +488,3 @@ if __name__ == '__main__':
         opt_pack(model, quantizers, args.wbits, args.groupsize)
         from safetensors.torch import save_file as safe_save
         safe_save(model.state_dict(), args.save_safetensors)
-
