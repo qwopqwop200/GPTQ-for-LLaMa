@@ -489,4 +489,3 @@ if __name__ == '__main__':
         opt_pack(model, quantizers, args.wbits, args.groupsize)
         from safetensors.torch import save_file as safe_save
         safe_save(model.state_dict(), args.save_safetensors)
-=
