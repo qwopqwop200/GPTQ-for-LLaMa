@@ -462,15 +462,6 @@ if __name__ == '__main__':
             )
             print(dataset)
             llama_eval(model, testloader, DEV)
-
-    if args.save:
-        llama_pack(model, quantizers, args.wbits, args.groupsize)
-        torch.save(model.state_dict(), args.save) 
-
-    if args.save_safetensors:
-        llama_pack(model, quantizers, args.wbits, args.groupsize)
-        from safetensors.torch import save_file as safe_save
-        safe_save(model.state_dict(), args.save_safetensors)
         
     if args.benchmark:
         gpus = [torch.device('cuda:%d' % i) for i in range(torch.cuda.device_count())]
@@ -481,5 +472,15 @@ if __name__ == '__main__':
         if args.benchmark:
             input_ids = next(iter(dataloader))[0][:, :args.benchmark]
             benchmark(model, input_ids, check=args.check)
+            
     if args.load:
         exit()
+
+    if args.save:
+        llama_pack(model, quantizers, args.wbits, args.groupsize)
+        torch.save(model.state_dict(), args.save) 
+
+    if args.save_safetensors:
+        llama_pack(model, quantizers, args.wbits, args.groupsize)
+        from safetensors.torch import save_file as safe_save
+        safe_save(model.state_dict(), args.save_safetensors)
