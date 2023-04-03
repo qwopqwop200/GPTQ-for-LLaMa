@@ -1,6 +1,6 @@
 safetensors==0.3.0
 datasets==2.10.1
 sentencepiece
-git+https://github.com/huggingface/transformers
+git+https://github.com/qwopqwop200/transformers-t5
 accelerate==0.17.1
 triton==2.0.0
