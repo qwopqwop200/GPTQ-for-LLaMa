@@ -134,6 +134,15 @@ It takes about 180 seconds to generate 45 tokens(5->50 tokens) on single RTX3090
 ```
 Basically, 4-bit quantization and 128 groupsize are recommended.
 
+## T5
+```
+# Save compressed model
+python t5.py google/flan-t5-small wikitext2 --wbits 4 --act-order --groupsize 128 --save t5-small-4bit-128g.pt
+# model test with the saved model
+python t5.py google/flan-t5-small wikitext2 --wbits 4 --act-order --groupsize 128 --load t5-small-4bit-128g.pt
+```
+
+
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
 
