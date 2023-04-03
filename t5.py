@@ -104,9 +104,7 @@ def t5_sequential(model, dataloader, dev):
         torch.cuda.empty_cache()
 
         inps, outs = outs, inps
-    model.encoder.final_layer_norm = model.encoder.final_layer_norm.to(dev)
-    encoder_hidden_states = model.encoder.final_layer_norm(inps) 
-    model.encoder.final_layer_norm = model.encoder.final_layer_norm.cpu()
+    encoder_hidden_states = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
     
     layers = model.decoder.block
     model.encoder.embed_tokens = model.encoder.embed_tokens.to(dev)
@@ -140,6 +138,7 @@ def t5_sequential(model, dataloader, dev):
 
     dtype = next(iter(model.parameters())).dtype
     inps = torch.zeros((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
+    encoder_hidden_states = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
     print('Ready.')
     attention_mask = cache['attention_mask']
     encoder_attention_mask = cache['encoder_attention_mask']
@@ -334,7 +333,7 @@ if __name__ == '__main__':
         from transformers import T5Tokenizer
         tokenizer = T5Tokenizer.from_pretrained(args.model)
 
-        input_text = "translate English to German: What is it?"
+        input_text = "Answer the following question by reasoning step by step. The cafeteria had 23 apples. If they used 20 for lunch, and bought 6 more, how many apple do they have?"
         input_ids = tokenizer(input_text, return_tensors="pt").input_ids.to("cuda")
 
         outputs = model.generate(input_ids)
