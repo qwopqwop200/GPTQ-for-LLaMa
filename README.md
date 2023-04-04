@@ -150,4 +150,4 @@ Thanks to Meta AI for releasing [LLaMA](https://arxiv.org/abs/2302.13971), a pow
 
 Triton GPTQ kernel code is based on [GPTQ-triton](https://github.com/fpgaminer/GPTQ-triton)
 
-I use [MMLU](https://arxiv.org/pdf/2009.03300.pdf) to benchmark the T5.
+This code use [MMLU](https://arxiv.org/pdf/2009.03300.pdf) to benchmark the T5.
