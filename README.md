@@ -138,8 +138,8 @@ Basically, 4-bit quantization and 128 groupsize are recommended.
 ```
 # Save compressed model
 python t5.py google/flan-t5-small wikitext2 --wbits 4 --act-order --groupsize 128 --save t5-small-4bit-128g.pt
-# model test with the saved model
-python t5.py google/flan-t5-small wikitext2 --wbits 4 --act-order --groupsize 128 --load t5-small-4bit-128g.pt
+# model benchmark with the saved model
+python t5.py google/flan-t5-small wikitext2 --wbits 4 --act-order --groupsize 128 --load t5-4bit-128g.pt --benchmark
 ```
 
 
