@@ -7,16 +7,19 @@ from gptq import *
 from modelutils import *
 from quant import *
 
+import os
+import numpy as np
+import pandas as pd
+
 def get_t5(model):
     def skip(*args, **kwargs):
         pass
     torch.nn.init.kaiming_uniform_ = skip
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
-    from transformers import T5ForConditionalGeneration
-    from transformers import AutoTokenizer 
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer 
     model_max_length = AutoTokenizer.from_pretrained(model, use_fast=False).model_max_length
-    model = T5ForConditionalGeneration.from_pretrained(model, torch_dtype='auto')
+    model = AutoModelForSeq2SeqLM.from_pretrained(model, torch_dtype='auto')
     model.seqlen = model_max_length
     return model
 
@@ -104,6 +107,7 @@ def t5_sequential(model, dataloader, dev):
         torch.cuda.empty_cache()
 
         inps, outs = outs, inps
+        
     encoder_hidden_states = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
     
     layers = model.decoder.block
@@ -137,8 +141,7 @@ def t5_sequential(model, dataloader, dev):
     torch.cuda.empty_cache()
 
     dtype = next(iter(model.parameters())).dtype
-    inps = torch.zeros((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
-    encoder_hidden_states = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
+    inps = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
     print('Ready.')
     attention_mask = cache['attention_mask']
     encoder_attention_mask = cache['encoder_attention_mask']
@@ -211,7 +214,7 @@ def load_quant(model, checkpoint, wbits, groupsize=-1):
     from transformers import AutoTokenizer 
     model_max_length = AutoTokenizer.from_pretrained(model, use_fast=False).model_max_length
 
-    from transformers import T5Config, T5ForConditionalGeneration 
+    from transformers import T5Config, AutoModelForSeq2SeqLM 
     config = T5Config.from_pretrained(model)
     def noop(*args, **kwargs):
         pass
@@ -222,7 +225,7 @@ def load_quant(model, checkpoint, wbits, groupsize=-1):
     torch.set_default_dtype(torch.half)
     transformers.modeling_utils._init_weights = False
     torch.set_default_dtype(torch.half)
-    model = T5ForConditionalGeneration(config)
+    model = AutoModelForSeq2SeqLM.from_config(config)
     torch.set_default_dtype(torch.float)
     model = model.eval()
     layers = find_layers(model)
@@ -244,6 +247,126 @@ def load_quant(model, checkpoint, wbits, groupsize=-1):
 
     return model
 
+# MMLU
+choices = ["A", "B", "C", "D"]
+
+def format_example(df, idx, include_answer=True):
+    prompt = df.iloc[idx, 0]
+    k = df.shape[1] - 2
+    for j in range(k):
+        prompt += "\n{}. {}".format(choices[j], df.iloc[idx, j + 1])
+    prompt += "\nAnswer:"
+    if include_answer:
+        prompt += " {}\n\n".format(df.iloc[idx, k + 1])
+    return prompt
+
+
+def gen_prompt(train_df, subject, k=-1):
+    def format_subject(subject):
+        l = subject.split("_")
+        s = ""
+        for entry in l:
+            s += " " + entry
+        return s
+
+    prompt = "The following are multiple choice questions (with answers) about {}.\n\n".format(
+        format_subject(subject)
+    )
+    if k == -1:
+        k = train_df.shape[0]
+    for i in range(k):
+        prompt += format_example(train_df, i)
+    return prompt
+
+
+@torch.no_grad()
+def eval(args, subject, model, tokenizer, dev_df, test_df):
+    cors = []
+    all_probs = []
+    answers = choices[: test_df.shape[1] - 2]
+
+    for i in range(test_df.shape[0]):
+        print(f'{i + 1}/{test_df.shape[0]}')
+        # get prompt and make sure it fits
+        k = args.ntrain
+        prompt_end = format_example(test_df, i, include_answer=False)
+        train_prompt = gen_prompt(dev_df, subject, k)
+        prompt = train_prompt + prompt_end
+
+        input_ids = tokenizer(prompt, return_tensors="pt").input_ids.cuda()
+
+        while input_ids.shape[-1] > 2048:
+            k -= 1
+            train_prompt = gen_prompt(dev_df, subject, k)
+            prompt = train_prompt + prompt_end
+            input_ids = tokenizer(prompt, return_tensors="pt").input_ids.cuda()
+
+        label = test_df.iloc[i, test_df.shape[1] - 1]
+
+        decoder_input_ids = tokenizer("", return_tensors="pt").input_ids.cuda()
+        decoder_input_ids = model._shift_right(decoder_input_ids)
+        logits = model(
+            input_ids=input_ids, decoder_input_ids=decoder_input_ids
+        ).logits.flatten().float()
+
+        probs = (
+            torch.nn.functional.softmax(
+                torch.tensor(
+                    [
+                        logits[tokenizer("A").input_ids[0]],
+                        logits[tokenizer("B").input_ids[0]],
+                        logits[tokenizer("C").input_ids[0]],
+                        logits[tokenizer("D").input_ids[0]],
+                    ]
+                ),
+                dim=0,
+            )
+            .detach()
+            .cpu()
+            .numpy()
+        )
+        pred = {0: "A", 1: "B", 2: "C", 3: "D"}[np.argmax(probs)]
+
+        cor = pred == label
+        cors.append(cor)
+        all_probs.append(probs)
+
+    acc = np.mean(cors)
+    cors = np.array(cors)
+
+    all_probs = np.array(all_probs)
+    print("Average accuracy {:.3f} - {}".format(acc, subject))
+
+    return cors, acc, all_probs
+
+
+def benchmark(model, tokenizer, args):
+    heads_per_gpu = len(model.encoder.block) // args.ngpu
+    device_map = {
+        gpu: list(
+            range(
+                0 + (gpu * heads_per_gpu),
+                (0 + (gpu * heads_per_gpu)) + heads_per_gpu,
+            )
+        )
+        for gpu in range(args.ngpu)
+    }
+    model.parallelize(device_map)
+    subjects = sorted(
+        ['college_biology']
+    )
+
+    all_cors = []
+    for subject in subjects:
+        dev_df = pd.read_csv(
+            os.path.join(args.data_dir, "dev", subject + "_dev.csv"), header=None
+        )[: args.ntrain]
+        test_df = pd.read_csv(
+            os.path.join(args.data_dir, "test", subject + "_test.csv"), header=None
+        )
+
+        cors, acc, probs = eval(args, subject, model, tokenizer, dev_df, test_df)
+        
 if __name__ == '__main__':
     import argparse
     from datautils import *
@@ -306,6 +429,22 @@ if __name__ == '__main__':
         '--act-order', action='store_true',
         help='Whether to apply the activation order GPTQ heuristic'
     )
+    parser.add_argument(
+        '--benchmark', action='store_true',
+        help='MMLU benchmarking'
+    )
+    parser.add_argument(
+        '--ntrain', "-k", type=int, default=5,
+        help='Number of k-shot to use for MMLU benchmarking.'
+    )
+    parser.add_argument(
+        "--ngpu", "-g", type=int, default=1,
+        help='Number of gpu to use for MMLU benchmarking.'
+    )
+    parser.add_argument(
+        "--data_dir", "-d", type=str, default="data",
+        help='MMLU dataset path'
+    )
     
     args = parser.parse_args()
 
@@ -328,17 +467,13 @@ if __name__ == '__main__':
         quantizers = t5_sequential(model, dataloader, DEV)
         print(time.time() - tick)
     
-    if args.load:
+    if args.load and args.benchmark:
         model = model.to(DEV)
         from transformers import T5Tokenizer
         tokenizer = T5Tokenizer.from_pretrained(args.model)
 
-        input_text = "Answer the following question by reasoning step by step. The cafeteria had 23 apples. If they used 20 for lunch, and bought 6 more, how many apple do they have?"
-        input_ids = tokenizer(input_text, return_tensors="pt").input_ids.to("cuda")
-
-        outputs = model.generate(input_ids)
-        print(tokenizer.decode(outputs[0]))
-
+        benchmark(model, tokenizer, args)
+        
     if args.load:
         exit()
 
