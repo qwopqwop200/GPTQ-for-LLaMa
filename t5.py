@@ -349,7 +349,7 @@ def gen_prompt(train_df, subject, k=-1):
 
 
 @torch.no_grad()
-def eval(args, subject, model, tokenizer, dev_df, test_df):
+def eval(args, subject, model, tokenizer, dev_df, test_df, progress):
     cors = []
     all_probs = []
     answers = choices[: test_df.shape[1] - 2]
@@ -403,7 +403,7 @@ def eval(args, subject, model, tokenizer, dev_df, test_df):
     cors = np.array(cors)
 
     all_probs = np.array(all_probs)
-    print("Average accuracy {:.3f} - {}".format(acc, subject))
+    print("Average accuracy {:.3f} - {}({}/{})".format(acc, subject,progress[0] + 1, progress[1]))
 
     return cors, acc, all_probs
 
@@ -434,7 +434,7 @@ def benchmark(model, tokenizer, args):
     }
     cat_cors = {cat: [] for cat in categories}
 
-    for subject in subjects:
+    for idx,subject in enumerate(subjects):
         dev_df = pd.read_csv(
             os.path.join(args.data_dir, "dev", subject + "_dev.csv"), header=None
         )[: args.ntrain]
@@ -442,7 +442,7 @@ def benchmark(model, tokenizer, args):
             os.path.join(args.data_dir, "test", subject + "_test.csv"), header=None
         )
 
-        cors, acc, probs = eval(args, subject, model, tokenizer, dev_df, test_df)
+        cors, acc, probs = eval(args, subject, model, tokenizer, dev_df, test_df, (idx,len(subjects)))
         subcats = subcategories[subject]
         for subcat in subcats:
             subcat_cors[subcat].append(cors)
