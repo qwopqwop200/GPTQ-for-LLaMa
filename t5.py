@@ -210,7 +210,7 @@ def t5_pack(model, quantizers, wbits, groupsize):
     print('Done.')
     return model
 
-def load_quant(model, checkpoint, wbits, groupsize=-1):
+def load_quant(model, checkpoint, wbits, groupsize = -1, warmup_autotune = True):
     from transformers import AutoTokenizer 
     model_max_length = AutoTokenizer.from_pretrained(model, use_fast=False).model_max_length
 
@@ -242,9 +242,12 @@ def load_quant(model, checkpoint, wbits, groupsize=-1):
         model.load_state_dict(safe_load(checkpoint), strict = False)
     else:
         model.load_state_dict(torch.load(checkpoint), strict = False)
+    
+    if warmup_autotune:
+        autotune_warmup(model)
     model.seqlen = model_max_length
     print('Done.')
-
+    
     return model
 
 # MMLU
