@@ -69,7 +69,7 @@ class Autotuner(triton.KernelInterface):
 			# In testings using only 40 reps seems to be close enough and it appears to be what PyTorch uses
 			# PyTorch also sets fast_flush to True, but I didn't see any speedup so I'll leave the default
 			return triton.testing.do_bench(kernel_call, rep=40)
-		except triton.OutOfResources:
+		except triton.compiler.OutOfResources:
 			return float('inf')
 
 	def run(self, *args, **kwargs):
