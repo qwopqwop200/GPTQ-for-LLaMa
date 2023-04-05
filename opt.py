@@ -240,7 +240,7 @@ def opt_pack(model, quantizers, wbits, groupsize):
     print('Done.')
     return model
 
-def load_quant(model, checkpoint, wbits, groupsize):
+def load_quant(model, checkpoint, wbits, groupsize = -1, warmup_autotune = True):
     from transformers import OPTConfig, OPTForCausalLM 
     config = OPTConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -269,6 +269,8 @@ def load_quant(model, checkpoint, wbits, groupsize):
         model.load_state_dict(safe_load(checkpoint))
     else:
         model.load_state_dict(torch.load(checkpoint))
+    if warmup_autotune:
+        autotune_warmup(model)
     model.seqlen = model.config.max_position_embeddings
     print('Done.')
     return model
