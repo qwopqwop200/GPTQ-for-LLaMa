@@ -251,6 +251,72 @@ def load_quant(model, checkpoint, wbits, groupsize = -1, warmup_autotune = True)
     return model
 
 # MMLU
+subcategories = {
+    "abstract_algebra": ["math"],
+    "anatomy": ["health"],
+    "astronomy": ["physics"],
+    "business_ethics": ["business"],
+    "clinical_knowledge": ["health"],
+    "college_biology": ["biology"],
+    "college_chemistry": ["chemistry"],
+    "college_computer_science": ["computer science"],
+    "college_mathematics": ["math"],
+    "college_medicine": ["health"],
+    "college_physics": ["physics"],
+    "computer_security": ["computer science"],
+    "conceptual_physics": ["physics"],
+    "econometrics": ["economics"],
+    "electrical_engineering": ["engineering"],
+    "elementary_mathematics": ["math"],
+    "formal_logic": ["philosophy"],
+    "global_facts": ["other"],
+    "high_school_biology": ["biology"],
+    "high_school_chemistry": ["chemistry"],
+    "high_school_computer_science": ["computer science"],
+    "high_school_european_history": ["history"],
+    "high_school_geography": ["geography"],
+    "high_school_government_and_politics": ["politics"],
+    "high_school_macroeconomics": ["economics"],
+    "high_school_mathematics": ["math"],
+    "high_school_microeconomics": ["economics"],
+    "high_school_physics": ["physics"],
+    "high_school_psychology": ["psychology"],
+    "high_school_statistics": ["math"],
+    "high_school_us_history": ["history"],
+    "high_school_world_history": ["history"],
+    "human_aging": ["health"],
+    "human_sexuality": ["culture"],
+    "international_law": ["law"],
+    "jurisprudence": ["law"],
+    "logical_fallacies": ["philosophy"],
+    "machine_learning": ["computer science"],
+    "management": ["business"],
+    "marketing": ["business"],
+    "medical_genetics": ["health"],
+    "miscellaneous": ["other"],
+    "moral_disputes": ["philosophy"],
+    "moral_scenarios": ["philosophy"],
+    "nutrition": ["health"],
+    "philosophy": ["philosophy"],
+    "prehistory": ["history"],
+    "professional_accounting": ["other"],
+    "professional_law": ["law"],
+    "professional_medicine": ["health"],
+    "professional_psychology": ["psychology"],
+    "public_relations": ["politics"],
+    "security_studies": ["politics"],
+    "sociology": ["culture"],
+    "us_foreign_policy": ["politics"],
+    "virology": ["health"],
+    "world_religions": ["philosophy"],
+}
+
+categories = {
+    "STEM": ["physics", "chemistry", "biology", "computer science", "math", "engineering"],
+    "humanities": ["history", "philosophy", "law"],
+    "social sciences": ["politics", "culture", "economics", "geography", "psychology"],
+    "other (business, health, misc.)": ["other", "business", "health"],
+}
 choices = ["A", "B", "C", "D"]
 
 def format_example(df, idx, include_answer=True):
@@ -289,7 +355,6 @@ def eval(args, subject, model, tokenizer, dev_df, test_df):
     answers = choices[: test_df.shape[1] - 2]
 
     for i in range(test_df.shape[0]):
-        print(f'{i + 1}/{test_df.shape[0]}')
         # get prompt and make sure it fits
         k = args.ntrain
         prompt_end = format_example(test_df, i, include_answer=False)
@@ -356,10 +421,19 @@ def benchmark(model, tokenizer, args):
     }
     model.parallelize(device_map)
     subjects = sorted(
-        ['college_biology']
+        [
+            f.split("_test.csv")[0]
+            for f in os.listdir(os.path.join(args.data_dir, "test"))
+            if "_test.csv" in f
+        ]
     )
 
     all_cors = []
+    subcat_cors = {
+        subcat: [] for subcat_lists in subcategories.values() for subcat in subcat_lists
+    }
+    cat_cors = {cat: [] for cat in categories}
+
     for subject in subjects:
         dev_df = pd.read_csv(
             os.path.join(args.data_dir, "dev", subject + "_dev.csv"), header=None
@@ -369,6 +443,23 @@ def benchmark(model, tokenizer, args):
         )
 
         cors, acc, probs = eval(args, subject, model, tokenizer, dev_df, test_df)
+        subcats = subcategories[subject]
+        for subcat in subcats:
+            subcat_cors[subcat].append(cors)
+            for key in categories.keys():
+                if subcat in categories[key]:
+                    cat_cors[key].append(cors)
+        all_cors.append(cors)
+
+    for subcat in subcat_cors:
+        subcat_acc = np.mean(np.concatenate(subcat_cors[subcat]))
+        print("Average accuracy {:.3f} - {}".format(subcat_acc, subcat))
+
+    for cat in cat_cors:
+        cat_acc = np.mean(np.concatenate(cat_cors[cat]))
+        print("Average accuracy {:.3f} - {}".format(cat_acc, cat))
+    weighted_acc = np.mean(np.concatenate(all_cors))
+    print("Average accuracy: {:.3f}".format(weighted_acc))
         
 if __name__ == '__main__':
     import argparse
