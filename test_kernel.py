@@ -95,7 +95,7 @@ quantizer.configure(2, perchannel=True, sym=False, mse=False)
 quantizer.find_params(layer.weight.data, weight=True)
 layer.weight.data = quantize(layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq)
 
-qlayer = QuantLinear(2, -1, layer.in_features, layer.out_features, layer.bias is not None,kernel_switch_threshold = False, is_trioton = False, is_cuda = True)
+qlayer = QuantLinear(2, -1, layer.in_features, layer.out_features, layer.bias is not None,kernel_switch_threshold = False, is_cuda = True)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
@@ -113,7 +113,7 @@ quantizer.configure(3, perchannel=True, sym=False, mse=False)
 quantizer.find_params(layer.weight.data, weight=True)
 layer.weight.data = quantize(layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq)
 
-qlayer = QuantLinear(3, -1, layer.in_features, layer.out_features, layer.bias is not None,kernel_switch_threshold = False, is_trioton = False, is_cuda = True)
+qlayer = QuantLinear(3, -1, layer.in_features, layer.out_features, layer.bias is not None,kernel_switch_threshold = False, is_cuda = True)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
@@ -131,7 +131,7 @@ quantizer.configure(4, perchannel=True, sym=False, mse=False)
 quantizer.find_params(layer.weight.data, weight=True)
 layer.weight.data = quantize(layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq)
 
-qlayer = QuantLinear(4, -1, layer.in_features, layer.out_features, layer.bias is not None,kernel_switch_threshold = False, is_trioton = False, is_cuda = True)
+qlayer = QuantLinear(4, -1, layer.in_features, layer.out_features, layer.bias is not None,kernel_switch_threshold = False, is_cuda = True)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
@@ -149,7 +149,7 @@ quantizer.configure(8, perchannel=True, sym=False, mse=False)
 quantizer.find_params(layer.weight.data, weight=True)
 layer.weight.data = quantize(layer.weight.data, quantizer.scale, quantizer.zero, quantizer.maxq)
 
-qlayer = QuantLinear(8, -1, layer.in_features, layer.out_features, layer.bias is not None,kernel_switch_threshold = False, is_trioton = False, is_cuda = True)
+qlayer = QuantLinear(8, -1, layer.in_features, layer.out_features, layer.bias is not None,kernel_switch_threshold = False, is_cuda = True)
 qlayer.pack(layer, quantizer.scale, quantizer.zero)
 
 qlayer = qlayer.to(DEV)
