@@ -196,6 +196,50 @@ def t5_sequential(model, dataloader, dev):
     model.config.use_cache = use_cache
     return quantizers
 
+@torch.no_grad()
+def t5_nearest_sequential(model, dev):
+    layers = model.encoder.block
+    quantizers = {}
+    for i in range(len(layers)):
+        layer = layers[i].to(dev)
+        full = find_layers(layer)
+        sequential = [list(full.keys())]
+       
+        for names in sequential:
+            subset = {n: full[n] for n in names}
+            for name in subset:
+                quantizer = Quantizer()
+                quantizer.configure(
+                    args.wbits, perchannel=True, sym=args.sym, mse=False
+                )
+                W = subset[name].weight.data
+                quantizer.find_params(W, weight=True)
+                
+                g_idx = torch.zeros(subset[name].in_features,dtype=torch.int32)
+                quantizers['encoder.block.%d.%s' % (i, name)] = (quantizer.cpu(),quantizer.scale.cpu(),quantizer.zero.cpu(),g_idx.cpu())
+        layer = layers[i].cpu()
+    
+    layers = model.decoder.block    
+    for i in range(len(layers)):
+        layer = layers[i].to(dev)
+        full = find_layers(layer)
+        sequential = [list(full.keys())]
+       
+        for names in sequential:
+            subset = {n: full[n] for n in names}
+            for name in subset:
+                quantizer = Quantizer()
+                quantizer.configure(
+                    args.wbits, perchannel=True, sym=args.sym, mse=False
+                )
+                W = subset[name].weight.data
+                quantizer.find_params(W, weight=True)
+                
+                g_idx = torch.zeros(subset[name].in_features,dtype=torch.int32)
+                quantizers['decoder.block.%d.%s' % (i, name)] = (quantizer.cpu(),quantizer.scale.cpu(),quantizer.zero.cpu(),g_idx.cpu())
+        layer = layers[i].cpu()
+    return quantizers
+
 # TODO: perform packing on GPU
 def t5_pack(model, quantizers, wbits, groupsize):
     layers = find_layers(model)
@@ -551,7 +595,7 @@ if __name__ == '__main__':
         model = get_t5(args.model)
         model.eval()
         
-    if not args.load:
+    if not args.nearest and not args.load:
         dataloader, testloader = get_loaders(
             args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
         )
@@ -559,6 +603,11 @@ if __name__ == '__main__':
     if not args.load and args.wbits < 16 and not args.nearest:
         tick = time.time()
         quantizers = t5_sequential(model, dataloader, DEV)
+        print(time.time() - tick)
+    
+    if not args.load and args.wbits < 16 and args.nearest:
+        tick = time.time()
+        quantizers = t5_nearest_sequential(model, DEV)
         print(time.time() - tick)
     
     if args.load and args.benchmark:
