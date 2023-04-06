@@ -94,7 +94,7 @@ def t5_sequential(model, dataloader, dev):
 
             for name in subset:
                 print(f'Quantizing {name} in Encoder layer {i+1}/{len(layers)}...')
-                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp_encoder, groupsize=args.groupsize, actorder=args.act_order)
                 quantizers['encoder.block.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu())
                 gptq[name].free()
                 
@@ -108,7 +108,9 @@ def t5_sequential(model, dataloader, dev):
 
         inps, outs = outs, inps
         
-    encoder_hidden_states = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
+    model.encoder.final_layer_norm = model.encoder.final_layer_norm.to(dev)
+    encoder_hidden_states = model.encoder.final_layer_norm(inps) 
+    model.encoder.final_layer_norm = model.encoder.final_layer_norm.cpu()
     
     layers = model.decoder.block
     model.encoder.embed_tokens = model.encoder.embed_tokens.to(dev)
@@ -176,7 +178,7 @@ def t5_sequential(model, dataloader, dev):
 
             for name in subset:
                 print(f'Quantizing {name} in Decoder layer {i+1}/{len(layers)}...')
-                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp_decoder, groupsize=args.groupsize, actorder=args.act_order)
                 quantizers['decoder.block.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu())
                 gptq[name].free()
                 
@@ -217,6 +219,7 @@ def t5_nearest_sequential(model, dev):
                 
                 g_idx = torch.zeros(subset[name].in_features,dtype=torch.int32)
                 quantizers['encoder.block.%d.%s' % (i, name)] = (quantizer.cpu(),quantizer.scale.cpu(),quantizer.zero.cpu(),g_idx.cpu())
+                print(f'Quantizing {name} in Encoder layer {i+1}/{len(layers)}...')
         layer = layers[i].cpu()
     
     layers = model.decoder.block    
@@ -237,6 +240,7 @@ def t5_nearest_sequential(model, dev):
                 
                 g_idx = torch.zeros(subset[name].in_features,dtype=torch.int32)
                 quantizers['decoder.block.%d.%s' % (i, name)] = (quantizer.cpu(),quantizer.scale.cpu(),quantizer.zero.cpu(),g_idx.cpu())
+                print(f'Quantizing {name} in Decoder layer {i+1}/{len(layers)}...')
         layer = layers[i].cpu()
     return quantizers
 
@@ -528,8 +532,12 @@ if __name__ == '__main__':
         help='Number of calibration data samples.'
     )
     parser.add_argument(
-        '--percdamp', type=float, default=.05,
-        help='Percent of the average Hessian diagonal to use for dampening.'
+        '--percdamp-encoder', type=float, default=.01,
+        help='Percent of the average Hessian diagonal to use for encoder dampening.'
+    )
+    parser.add_argument(
+        '--percdamp-decoder', type=float, default=.02,
+        help='Percent of the average Hessian diagonal to use for decoder dampening.'
     )
     parser.add_argument(
         '--nearest', action='store_true',
