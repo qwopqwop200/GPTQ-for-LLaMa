@@ -332,67 +332,49 @@ try:
 except:
     print('trioton not installed.')
 
-def autotune_warmup(model):
-    """
-    Pre-tunes the quantized kernel
-    """
-    from tqdm import tqdm
+def matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq):
+    output = torch.empty((input.shape[0], qweight.shape[1]), device='cuda', dtype=torch.float16)
+    grid = lambda META: (triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(qweight.shape[1], META['BLOCK_SIZE_N']),)
+    matmul_248_kernel[grid](input, qweight, output,
+                            scales, qzeros, g_idx,
+                            input.shape[0], qweight.shape[1], input.shape[1], bits, maxq,
+                            input.stride(0), input.stride(1),
+                            qweight.stride(0), qweight.stride(1),
+                            output.stride(0), output.stride(1),
+                            scales.stride(0), qzeros.stride(0))
+    return output
 
-    n_values = {}
-
-    for _, m in model.named_modules():
-        if not isinstance(m, QuantLinear):
-            continue
-
-        k = m.infeatures
-        n = m.outfeatures
-
-        n_values[n] = (k, m.qweight, m.scales, m.qzeros, m.g_idx, m.bits, m.maxq)
-
-    print(f'Found {len(n_values)} unique N values.')
-
-    print('Warming up autotune cache ...')
-    for m in tqdm(range(0, 12)):
-        m = 2 ** m   # [1, 2048]
-        for n, (k, qweight, scales, qzeros, g_idx, bits, maxq) in n_values.items():
-            a = torch.randn(m, k, dtype=torch.float16, device='cuda')
-            QuantLinearFunction.apply(a, qweight.cuda(), scales.cuda(), qzeros.cuda(), g_idx.cuda(), bits, maxq)
+def transpose_matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq):
+    output_dim = (qweight.shape[0] * 32) // bits
+    output = torch.empty((input.shape[0], output_dim), device='cuda', dtype=torch.float16)
+    grid = lambda META: (triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(output_dim, META['BLOCK_SIZE_K']),)
+    transpose_matmul_248_kernel[grid](input, qweight, output,
+                                      scales, qzeros, g_idx,
+                                      input.shape[0], qweight.shape[1], output_dim, bits, maxq,
+                                      input.stride(0), input.stride(1),
+                                      qweight.stride(0), qweight.stride(1),
+                                      output.stride(0), output.stride(1),
+                                      scales.stride(0), qzeros.stride(0))
+    return output
 
 class QuantLinearFunction(torch.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=torch.float16)
     def forward(ctx, input, qweight, scales, qzeros, g_idx, bits, maxq):
-        output = torch.empty((input.shape[0], qweight.shape[1]), device='cuda', dtype=torch.float16)
-        grid = lambda META: (triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(qweight.shape[1], META['BLOCK_SIZE_N']),)
-        matmul_248_kernel[grid](input, qweight, output,
-                                scales, qzeros, g_idx,
-                                input.shape[0], qweight.shape[1], input.shape[1], bits, maxq,
-                                input.stride(0), input.stride(1),
-                                qweight.stride(0), qweight.stride(1),
-                                output.stride(0), output.stride(1),
-                                scales.stride(0), qzeros.stride(0))
-        
+        output = matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq)
         ctx.save_for_backward(qweight, scales, qzeros, g_idx)
-        ctx.input_shape, ctx.bits,ctx.maxq = input.shape,bits, maxq
+        ctx.bits,ctx.maxq = bits, maxq
         return output
     
     @staticmethod
     @custom_bwd
     def backward(ctx, grad_output):
-        input_shape, bits, maxq = ctx.input_shape, ctx.bits, ctx.maxq
         qweight, scales, qzeros, g_idx = ctx.saved_tensors
+        bits, maxq = ctx.bits, ctx.maxq
         grad_input = None
 
         if ctx.needs_input_grad[0]:
-            grade_input = torch.empty((input_shape[0], input_shape[1]), device='cuda', dtype=torch.float32)
-            grid = lambda META: (triton.cdiv(input_shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(input_shape[1], META['BLOCK_SIZE_K']),)
-            trans_matmul_248_kernel[grid](grad_output, qweight, grade_input,
-                                          scales, qzeros, g_idx,
-                                          input_shape[0], qweight.shape[1], input_shape[1], bits, maxq,
-                                          grad_output.stride(0), grad_output.stride(1),
-                                          qweight.stride(0), qweight.stride(1),
-                                          grade_input.stride(0), grade_input.stride(1),
-                                          scales.stride(0), qzeros.stride(0))
+            grad_input = transpose_matmul248(grad_output, qweight, scales, qzeros, g_idx, bits, maxq)
         return grad_input, None, None, None, None, None, None
     
 class QuantLinear(nn.Module): 
@@ -469,6 +451,37 @@ class QuantLinear(nn.Module):
                                         self.qzeros, self.g_idx, self.bits, self.maxq)
         out = out + self.bias if self.bias is not None else out  
         return out.reshape(out_shape)
+        
+def autotune_warmup(model, transpose = False):
+    """
+    Pre-tunes the quantized kernel
+    """
+    from tqdm import tqdm
+
+    n_values = {}
+
+    for _, m in model.named_modules():
+        if not isinstance(m, QuantLinear):
+            continue
+
+        k = m.infeatures
+        n = m.outfeatures
+        
+        if n not in n_values:
+            n_values[n] = (k, m.qweight.cuda(), m.scales.cuda(), m.qzeros.cuda(), m.g_idx.cuda(), m.bits, m.maxq)
+
+    print(f'Found {len(n_values)} unique N values.')
+
+    print('Warming up autotune cache ...')
+    for m in tqdm(range(0, 12)):
+        m = 2 ** m   # [1, 2048]
+        for n, (k, qweight, scales, qzeros, g_idx, bits, maxq) in n_values.items():
+            a = torch.randn(m, k, dtype=torch.float16, device='cuda')
+            matmul248(a, qweight, scales, qzeros, g_idx, bits, maxq)
+            if transpose:
+                a = torch.randn(m, n, dtype=torch.float16, device='cuda')
+                transpose_matmul248(a, qweight, scales, qzeros, g_idx, bits, maxq)
+    del n_values
         
 def make_quant(module, names, bits, groupsize, name=''):
     if isinstance(module, QuantLinear):
