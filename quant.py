@@ -384,14 +384,14 @@ class QuantLinearFunction(torch.autograd.Function):
         grad_input = None
 
         if ctx.needs_input_grad[0]:
-            grade_input = torch.empty((input_shape[0], input_shape[1]), device='cuda', dtype=torch.float32)
+            grad_input = torch.empty((input_shape[0], input_shape[1]), device='cuda', dtype=torch.float32)
             grid = lambda META: (triton.cdiv(input_shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(input_shape[1], META['BLOCK_SIZE_K']),)
-            trans_matmul_248_kernel[grid](grad_output, qweight, grade_input,
+            trans_matmul_248_kernel[grid](grad_output, qweight, grad_input,
                                           scales, qzeros, g_idx,
                                           input_shape[0], qweight.shape[1], input_shape[1], bits, maxq,
                                           grad_output.stride(0), grad_output.stride(1),
                                           qweight.stride(0), qweight.stride(1),
-                                          grade_input.stride(0), grade_input.stride(1),
+                                          grad_input.stride(0), grad_input.stride(1),
                                           scales.stride(0), qzeros.stride(0))
         return grad_input, None, None, None, None, None, None
     
