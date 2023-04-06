@@ -94,7 +94,7 @@ def t5_sequential(model, dataloader, dev):
 
             for name in subset:
                 print(f'Quantizing {name} in Encoder layer {i+1}/{len(layers)}...')
-                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp_encoder, groupsize=args.groupsize, actorder=args.act_order)
+                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
                 quantizers['encoder.block.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu())
                 gptq[name].free()
                 
@@ -184,7 +184,7 @@ def t5_sequential(model, dataloader, dev):
 
             for name in subset:
                 print(f'Quantizing {name} in Decoder layer {i+1}/{len(layers)}...')
-                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp_decoder, groupsize=args.groupsize, actorder=args.act_order)
+                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
                 quantizers['decoder.block.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu())
                 gptq[name].free()
                 
@@ -538,12 +538,8 @@ if __name__ == '__main__':
         help='Number of calibration data samples.'
     )
     parser.add_argument(
-        '--percdamp-encoder', type=float, default=.01,
-        help='Percent of the average Hessian diagonal to use for encoder dampening.'
-    )
-    parser.add_argument(
-        '--percdamp-decoder', type=float, default=.01,
-        help='Percent of the average Hessian diagonal to use for decoder dampening.'
+        '--percdamp', type=float, default=.01,
+        help='Percent of the average Hessian diagonal to use for dampening.'
     )
     parser.add_argument(
         '--nearest', action='store_true',
