@@ -108,13 +108,21 @@ def t5_sequential(model, dataloader, dev):
 
         inps, outs = outs, inps
         
-    encoder_hidden_states = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
+    model.encoder.final_layer_norm = model.encoder.final_layer_norm.to(dev)
+    model.encoder.dropout = model.encoder.dropout.to(dev)
+    
+    encoder_hidden_states = model.encoder.final_layer_norm(inps)
+    encoder_hidden_states = model.encoder.dropout(encoder_hidden_states)
+    
+    model.encoder.final_layer_norm = model.encoder.final_layer_norm.cpu()
+    model.encoder.dropout = model.encoder.dropout.cpu()
     
     layers = model.decoder.block
     model.encoder.embed_tokens = model.encoder.embed_tokens.to(dev)
     model.decoder.embed_tokens = model.decoder.embed_tokens.to(dev)
     layers[0] = layers[0].to(dev)
-
+    
+    inps = torch.zeros((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
     cache = {'i': 0, 'attention_mask': None}
 
     class Catcher(nn.Module):
@@ -141,8 +149,8 @@ def t5_sequential(model, dataloader, dev):
     torch.cuda.empty_cache()
 
     dtype = next(iter(model.parameters())).dtype
-    inps = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
     print('Ready.')
+    outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
     encoder_attention_mask = cache['encoder_attention_mask']
     for i in range(len(layers)):
@@ -534,7 +542,7 @@ if __name__ == '__main__':
         help='Percent of the average Hessian diagonal to use for encoder dampening.'
     )
     parser.add_argument(
-        '--percdamp-decoder', type=float, default=.02,
+        '--percdamp-decoder', type=float, default=.01,
         help='Percent of the average Hessian diagonal to use for decoder dampening.'
     )
     parser.add_argument(
