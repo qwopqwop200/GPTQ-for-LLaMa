@@ -626,9 +626,6 @@ if __name__ == '__main__':
         tokenizer = T5Tokenizer.from_pretrained(args.model)
 
         benchmark(model, tokenizer, args)
-        
-    if args.load:
-        exit()
 
     if args.save:
         t5_pack(model, quantizers, args.wbits, args.groupsize)
