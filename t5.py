@@ -108,9 +108,7 @@ def t5_sequential(model, dataloader, dev):
 
         inps, outs = outs, inps
         
-    model.encoder.final_layer_norm = model.encoder.final_layer_norm.to(dev)
-    encoder_hidden_states = model.encoder.final_layer_norm(inps) 
-    model.encoder.final_layer_norm = model.encoder.final_layer_norm.cpu()
+    encoder_hidden_states = torch.ones((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
     
     layers = model.decoder.block
     model.encoder.embed_tokens = model.encoder.embed_tokens.to(dev)
