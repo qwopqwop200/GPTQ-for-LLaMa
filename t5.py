@@ -420,7 +420,7 @@ def mmlu_eval(args, subject, model, tokenizer, dev_df, test_df, progress):
 
         input_ids = tokenizer(prompt, return_tensors="pt").input_ids.cuda()
 
-        while input_ids.shape[-1] > model.seqlen:
+        while input_ids.shape[-1] > 2048:
             k -= 1
             train_prompt = mmlu_gen_prompt(dev_df, subject, k)
             prompt = train_prompt + prompt_end
@@ -579,7 +579,7 @@ class EvalModel:
     def __init__(self, model, tokenizer):
         self.model = model
         self.tokenizer = tokenizer
-        self.max_input_length = self.model.seqlen
+        self.max_input_length = 2048
         self.max_output_length = 512
 
     def run(self, prompt):
