@@ -11,6 +11,8 @@ import os
 import numpy as np
 import pandas as pd
 
+from datasets import load_dataset, get_dataset_config_names, Dataset
+
 def get_t5(model):
     def skip(*args, **kwargs):
         pass
@@ -373,7 +375,7 @@ categories = {
 }
 choices = ["A", "B", "C", "D"]
 
-def format_example(df, idx, include_answer=True):
+def mmlu_format_example(df, idx, include_answer=True):
     prompt = df.iloc[idx, 0]
     k = df.shape[1] - 2
     for j in range(k):
@@ -384,7 +386,7 @@ def format_example(df, idx, include_answer=True):
     return prompt
 
 
-def gen_prompt(train_df, subject, k=-1):
+def mmlu_gen_prompt(train_df, subject, k=-1):
     def format_subject(subject):
         l = subject.split("_")
         s = ""
@@ -398,28 +400,28 @@ def gen_prompt(train_df, subject, k=-1):
     if k == -1:
         k = train_df.shape[0]
     for i in range(k):
-        prompt += format_example(train_df, i)
+        prompt += mmlu_format_example(train_df, i)
     return prompt
 
 
 @torch.no_grad()
-def eval(args, subject, model, tokenizer, dev_df, test_df, progress):
+def mmlu_eval(args, subject, model, tokenizer, dev_df, test_df, progress):
     cors = []
     all_probs = []
     answers = choices[: test_df.shape[1] - 2]
 
     for i in range(test_df.shape[0]):
         # get prompt and make sure it fits
-        k = args.ntrain
-        prompt_end = format_example(test_df, i, include_answer=False)
-        train_prompt = gen_prompt(dev_df, subject, k)
+        k = args.ntrain_mmlu
+        prompt_end = mmlu_format_example(test_df, i, include_answer=False)
+        train_prompt = mmlu_gen_prompt(dev_df, subject, k)
         prompt = train_prompt + prompt_end
 
         input_ids = tokenizer(prompt, return_tensors="pt").input_ids.cuda()
 
-        while input_ids.shape[-1] > 2048:
+        while input_ids.shape[-1] > model.seqlen:
             k -= 1
-            train_prompt = gen_prompt(dev_df, subject, k)
+            train_prompt = mmlu_gen_prompt(dev_df, subject, k)
             prompt = train_prompt + prompt_end
             input_ids = tokenizer(prompt, return_tensors="pt").input_ids.cuda()
 
@@ -462,7 +464,7 @@ def eval(args, subject, model, tokenizer, dev_df, test_df, progress):
     return cors, acc, all_probs
 
 
-def benchmark(model, tokenizer, args):
+def mmlu_benchmark(model, tokenizer, args):
     heads_per_gpu = len(model.encoder.block) // args.ngpu
     device_map = {
         gpu: list(
@@ -491,12 +493,12 @@ def benchmark(model, tokenizer, args):
     for idx,subject in enumerate(subjects):
         dev_df = pd.read_csv(
             os.path.join(args.data_dir, "dev", subject + "_dev.csv"), header=None
-        )[: args.ntrain]
+        )[: args.ntrain_mmlu]
         test_df = pd.read_csv(
             os.path.join(args.data_dir, "test", subject + "_test.csv"), header=None
         )
 
-        cors, acc, probs = eval(args, subject, model, tokenizer, dev_df, test_df, (idx,len(subjects)))
+        cors, acc, probs = mmlu_eval(args, subject, model, tokenizer, dev_df, test_df, (idx,len(subjects)))
         subcats = subcategories[subject]
         for subcat in subcats:
             subcat_cors[subcat].append(cors)
@@ -513,8 +515,81 @@ def benchmark(model, tokenizer, args):
         cat_acc = np.mean(np.concatenate(cat_cors[cat]))
         print("Average accuracy {:.3f} - {}".format(cat_acc, cat))
     weighted_acc = np.mean(np.concatenate(all_cors))
-    print("Average accuracy: {:.3f}".format(weighted_acc))
+    print("MMLU Average accuracy: {:.3f}".format(weighted_acc))
         
+# BBH
+
+def bbh_format_example(dataset, idx, include_answer=True):
+    prompt = dataset["input"][idx]
+    prompt += "\nAnswer:"
+    if include_answer:
+        prompt += " {}\n\n".format(dataset["target"][idx])
+    return prompt
+
+
+def bbh_gen_prompt(dataset , k=-1):
+    prompt = ""
+    if k == -1:
+        k = len(dataset)
+    for i in range(k):
+        prompt += bbh_format_example(dataset, i)
+    return prompt
+
+
+def bbh_evaluate(model, dataset: Dataset, ntrain):
+    data_train = dataset[:ntrain]
+    data_test = dataset[ntrain:]
+    is_correct = []
+
+    for i in range(len(dataset) - ntrain):
+        # get prompt and make sure it fits
+        k = int(ntrain)
+        prompt_end = bbh_format_example(data_test, i, include_answer=False)
+        train_prompt = bbh_gen_prompt(data_train, k)
+        prompt = train_prompt + prompt_end
+
+        while not model.check_valid_length(prompt) and k > 0:
+            k -= 1
+            train_prompt = bbh_gen_prompt(data_train, k)
+            prompt = train_prompt + prompt_end
+
+        label = data_test["target"][i]
+        pred = model.run(prompt)
+        is_correct.append(pred.strip().startswith(label))
+
+    return sum(is_correct) / len(is_correct)
+
+
+def bbh_benchmark(model, ntrain = 3, data_dir = "lukaemon/bbh"):
+    model.max_output_length = 32
+
+    all_results = []
+    data_names = get_dataset_config_names(data_dir)
+    for idx, name in enumerate(data_names):
+        dataset = load_dataset(data_dir, name, split="test")
+        result = bbh_evaluate(model, dataset, ntrain=ntrain)
+        all_results.append(result)
+        print("Average accuracy {:.3f} - {}({}/{})".format(result, name, idx + 1, len(data_names)))
+
+    score = (sum(all_results) / len(all_results))
+    print("BBH Average accuracy: {:.3f}".format(score))
+
+class EvalModel:
+    def __init__(self, model, tokenizer):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.max_input_length = self.model.seqlen
+        self.max_output_length = 512
+
+    def run(self, prompt):
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        outputs = self.model.generate(**inputs, max_length=self.max_output_length)
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    def check_valid_length(self, text):
+        inputs = self.tokenizer(text)
+        return len(inputs.input_ids) <= self.max_input_length
+
 if __name__ == '__main__':
     import argparse
     from datautils import *
@@ -579,11 +654,19 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--benchmark', action='store_true',
-        help='MMLU benchmarking'
+        help='MMLU/BBH benchmarking'
     )
     parser.add_argument(
-        '--ntrain', "-k", type=int, default=5,
+        '--benchmark_mode', default='mmlu' ,choices=['bbh','mmlu','both'],
+        help='select benchmark dataset'
+    )
+    parser.add_argument(
+        '--ntrain_mmlu', type=int, default=5,
         help='Number of k-shot to use for MMLU benchmarking.'
+    )
+    parser.add_argument(
+        '--ntrain_bbh', type=int, default=3,
+        help='Number of k-shot to use for BBH benchmarking.'
     )
     parser.add_argument(
         "--ngpu", "-g", type=int, default=1,
@@ -620,12 +703,16 @@ if __name__ == '__main__':
         quantizers = t5_nearest_sequential(model, DEV)
         print(time.time() - tick)
     
-    if args.load and args.benchmark:
+    if args.benchmark:
         model = model.to(DEV)
         from transformers import T5Tokenizer
         tokenizer = T5Tokenizer.from_pretrained(args.model)
-
-        benchmark(model, tokenizer, args)
+        if args.benchmark_mode != 'bbh':
+            mmlu_benchmark(model, tokenizer, args)
+        
+        if args.benchmark_mode != 'mmlu':
+            evalmodel = EvalModel(model,tokenizer)
+            bbh_benchmark(evalmodel, args.ntrain_bbh)
 
     if args.save:
         t5_pack(model, quantizers, args.wbits, args.groupsize)
