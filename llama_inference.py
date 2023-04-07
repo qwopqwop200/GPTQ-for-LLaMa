@@ -122,7 +122,7 @@ if __name__ == '__main__':
         model.eval()
         
     model.to(DEV)
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
     input_ids = tokenizer.encode(args.text, return_tensors="pt").to(DEV)
 
     with torch.no_grad():
