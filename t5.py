@@ -58,10 +58,9 @@ def t5_sequential(model, dataloader, dev):
             pass
     layers[0] = layers[0].module
     layers[0] = layers[0].cpu()
-    
     model.encoder.embed_tokens = model.encoder.embed_tokens.cpu()
     torch.cuda.empty_cache()
-
+    
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
     print('Ready.')
@@ -124,8 +123,9 @@ def t5_sequential(model, dataloader, dev):
     model.decoder.embed_tokens = model.decoder.embed_tokens.to(dev)
     layers[0] = layers[0].to(dev)
     
-    inps = torch.zeros((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
-    cache = {'i': 0, 'attention_mask': None}
+    cache = {'i': 0, 'attention_mask': None, 'encoder_attention_mask': None}
+    
+    inps = torch.zeros((args.nsamples, model.seqlen, model.encoder.config.d_model), dtype=dtype, device=dev)
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -138,9 +138,9 @@ def t5_sequential(model, dataloader, dev):
             cache['encoder_attention_mask'] = kwargs['encoder_attention_mask']
             raise ValueError
     layers[0] = Catcher(layers[0])
-    for batch in dataloader:
+    for j,batch in enumerate(dataloader):
         try:
-            model(decoder_input_ids = batch[0].to(dev),encoder_outputs = [encoder_hidden_states[:1],])
+            model(decoder_input_ids = batch[0].to(dev),encoder_outputs = [encoder_hidden_states[j:j+1],])
         except ValueError:
             pass
     layers[0] = layers[0].module
