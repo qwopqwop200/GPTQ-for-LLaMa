@@ -10,6 +10,7 @@ from quant import *
 import os
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from datasets import load_dataset, get_dataset_config_names, Dataset
 
@@ -410,7 +411,7 @@ def mmlu_eval(args, subject, model, tokenizer, dev_df, test_df, progress):
     all_probs = []
     answers = choices[: test_df.shape[1] - 2]
 
-    for i in range(test_df.shape[0]):
+    for i in tqdm(range(test_df.shape[0])):
         # get prompt and make sure it fits
         k = args.ntrain_mmlu
         prompt_end = mmlu_format_example(test_df, i, include_answer=False)
@@ -541,7 +542,7 @@ def bbh_evaluate(model, dataset: Dataset, ntrain):
     data_test = dataset[ntrain:]
     is_correct = []
 
-    for i in range(len(dataset) - ntrain):
+    for i in tqdm(range(len(dataset) - ntrain)):
         # get prompt and make sure it fits
         k = int(ntrain)
         prompt_end = bbh_format_example(data_test, i, include_answer=False)
