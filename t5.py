@@ -53,7 +53,7 @@ def t5_sequential(model, dataloader, dev):
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
         try:
-            model(batch[0].to(dev))
+            model(batch[0].to(dev)[:,:model.seqlen])
         except ValueError:
             pass
     layers[0] = layers[0].module
@@ -140,7 +140,7 @@ def t5_sequential(model, dataloader, dev):
     layers[0] = Catcher(layers[0])
     for j,batch in enumerate(dataloader):
         try:
-            model(decoder_input_ids = batch[0].to(dev),encoder_outputs = [encoder_hidden_states[j:j+1],])
+            model(decoder_input_ids = batch[0].to(dev)[:,model.seqlen:],encoder_outputs = [encoder_hidden_states[j:j+1],])
         except ValueError:
             pass
     layers[0] = layers[0].module
@@ -690,7 +690,7 @@ if __name__ == '__main__':
         
     if not args.nearest and not args.load:
         dataloader, testloader = get_loaders(
-            args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
+            args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen * 2
         )
 
     if not args.load and args.wbits < 16 and not args.nearest:
