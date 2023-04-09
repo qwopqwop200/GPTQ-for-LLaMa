@@ -269,9 +269,7 @@ def load_quant(model, checkpoint, wbits, groupsize = -1, warmup_autotune = True)
         model.load_state_dict(safe_load(checkpoint))
     else:
         model.load_state_dict(torch.load(checkpoint))
-        
-    make_quant_attn(model)
-        
+                
     if warmup_autotune:
         autotune_warmup(model)
     model.seqlen = model.config.max_position_embeddings
