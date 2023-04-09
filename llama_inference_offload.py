@@ -228,6 +228,10 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
         model.load_state_dict(torch.load(checkpoint))
     model.seqlen = 2048
     
+    make_quant_attn(model)
+
+    if warmup_autotune:
+        autotune_warmup(model)
     for i in range(pre_layer):
         model.model.layers[i].to(DEV)
     model.model.embed_tokens.to(DEV)
