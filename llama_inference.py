@@ -52,6 +52,11 @@ def load_quant(model, checkpoint, wbits, groupsize, device):
         model.load_state_dict(safe_load(checkpoint, device))
     else:
         model.load_state_dict(torch.load(checkpoint))
+        
+    make_quant_attn(model)
+
+    if warmup_autotune:
+        autotune_warmup(model)
     model.seqlen = 2048
     print('Done.')
 
