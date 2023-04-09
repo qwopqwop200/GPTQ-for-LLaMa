@@ -295,15 +295,15 @@ try:
     )
     
     @triton.jit
-    def trans_matmul_248_kernel(a_ptr, b_ptr, c_ptr,
-                                scales_ptr, zeros_ptr, g_ptr,
-                                M, N, K, bits, maxq,
-                                stride_am, stride_ak,
-                                stride_bk, stride_bn,
-                                stride_cm, stride_cn,
-                                stride_scales, stride_zeros,
-                                BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
-                                GROUP_SIZE_M: tl.constexpr):
+    def transpose_matmul_248_kernel(a_ptr, b_ptr, c_ptr,
+                                    scales_ptr, zeros_ptr, g_ptr,
+                                    M, N, K, bits, maxq,
+                                    stride_am, stride_ak,
+                                    stride_bk, stride_bn,
+                                    stride_cm, stride_cn,
+                                    stride_scales, stride_zeros,
+                                    BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+                                    GROUP_SIZE_M: tl.constexpr):
         """
         Compute the matrix multiplication C = A x B.
         A is of shape (M, N) float16
