@@ -299,7 +299,7 @@ def load_quant(model, checkpoint, wbits, groupsize = -1, warmup_autotune = True)
         model.load_state_dict(safe_load(checkpoint), strict = False)
     else:
         model.load_state_dict(torch.load(checkpoint), strict = False)
-    
+
     if warmup_autotune:
         autotune_warmup(model)
     model.seqlen = model_max_length
