@@ -296,7 +296,7 @@ if __name__ == '__main__':
     
     model = load_quant(args.model, args.load, args.wbits, args.groupsize, args.pre_layer)
         
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
     input_ids = tokenizer.encode(args.text, return_tensors="pt").to(DEV)
 
     with torch.no_grad():
