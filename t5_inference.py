@@ -166,4 +166,4 @@ if __name__ == '__main__':
             input_str = input('Enter a prompt: ')
             data['inputs'] = input_str
             res = predict_fn(data,(model,tokenizer))
-            print(res)
+            print('Output: ', res)
