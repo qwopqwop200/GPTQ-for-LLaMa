@@ -15,11 +15,16 @@ from transformers.models.llama.modeling_llama import LlamaModel,LlamaConfig
 from transformers.modeling_outputs import BaseModelOutputWithPast
 from typing import List, Optional, Tuple, Union
 import time
-
+from accelerate import cpu_offload_with_hook,load_checkpoint_in_model
 class Offload_LlamaModel(LlamaModel):
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
-
+        
+    def cpu_offload(self,preload):
+        hook = None
+        for cpu_offloaded_model in self.layers[preload:]:
+            _, hook = cpu_offload_with_hook(cpu_offloaded_model, DEV, prev_module_hook=hook)
+            
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -132,10 +137,7 @@ class Offload_LlamaModel(LlamaModel):
         next_decoder_cache = () if use_cache else None
         
         for idx in range(len(self.layers)):
-            if idx <= (self.preload - 1):
-                decoder_layer = self.layers[idx]
-            else:
-                decoder_layer = self.layers[idx].to(DEV)
+            decoder_layer = self.layers[idx]
                 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -169,12 +171,6 @@ class Offload_LlamaModel(LlamaModel):
                 )
 
             hidden_states = layer_outputs[0]
-            
-            if idx > (self.preload - 1):
-                self.layers[idx] = decoder_layer.cpu()
-            del decoder_layer
-            torch.cuda.empty_cache()
-                
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
@@ -198,7 +194,7 @@ class Offload_LlamaModel(LlamaModel):
             attentions=all_self_attns,
         )
 
-def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
+def load_quant(model, checkpoint, wbits, groupsize, pre_layer, warmup_autotune=True):
     transformers.models.llama.modeling_llama.LlamaModel = Offload_LlamaModel
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
@@ -221,11 +217,7 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
     make_quant(model, layers, wbits, groupsize)
 
     print('Loading model ...')
-    if checkpoint.endswith('.safetensors'):
-        from safetensors.torch import load_file as safe_load
-        model.load_state_dict(safe_load(checkpoint))
-    else:
-        model.load_state_dict(torch.load(checkpoint))
+    load_checkpoint_in_model(model, checkpoint, dtype='float16')
     model.seqlen = 2048
     
     make_quant_attn(model)
@@ -237,7 +229,7 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
     model.model.embed_tokens.to(DEV)
     model.model.norm.to(DEV)
     model.lm_head.to(DEV)
-    model.model.preload = pre_layer
+    model.model.cpu_offload(pre_layer)
     print('Done.')
     return model
 
