@@ -140,6 +140,10 @@ Basically, 4-bit quantization and 128 groupsize are recommended.
 python t5.py google/flan-t5-small wikitext2 --wbits 4 --act-order --groupsize 128 --save t5-small-4bit-128g.pt
 # model benchmark with the saved model
 python t5.py google/flan-t5-small wikitext2 --wbits 4 --act-order --groupsize 128 --load t5-small-4bit-128g.pt --benchmark
+# model inference with the saved model
+python t5_inference.py google/flan-t5-small --wbits 4 --groupsize 128 --load t5-small-4bit-128g.pt --text "What color is an orange?" --min_length 1
+# model inference with a simple repl
+python t5_inference.py google/flan-t5-small --wbits 4 --groupsize 128 --load t5-small-4bit-128g.pt --repl
 ```
 
 
