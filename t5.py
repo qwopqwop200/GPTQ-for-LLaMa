@@ -722,4 +722,6 @@ if __name__ == '__main__':
     if args.save_safetensors:
         t5_pack(model, quantizers, args.wbits, args.groupsize)
         from safetensors.torch import save_file as safe_save
-        safe_save(model.state_dict(), args.save_safetensors)
+        state_dict = model.state_dict()
+        state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
+        safe_save(state_dict, args.save_safetensors)
