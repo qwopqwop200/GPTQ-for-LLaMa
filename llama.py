@@ -289,15 +289,9 @@ def llama_multigpu(model, gpus):
             inp = list(inp)
             if inp[0].device != self.dev:
                 inp[0] = inp[0].to(self.dev)
-            # if cache['mask'] is None or cache['mask'].device != self.dev:
-            #     cache['mask'] = kwargs['attention_mask'].to(self.dev)
-            # kwargs['attention_mask'] = cache['mask']
-            for k, v in kwargs.items():
-                try:
-                    if v.device != self.dev:
-                        kwargs[k] = v.to(self.dev)
-                except AttributeError:
-                    pass
+            if cache['mask'] is None or cache['mask'].device != self.dev:
+                cache['mask'] = kwargs['attention_mask'].to(self.dev)
+            kwargs['attention_mask'] = cache['mask']
             tmp = self.module(*inp, **kwargs)
             return tmp
 
@@ -305,28 +299,6 @@ def llama_multigpu(model, gpus):
     pergpu = math.ceil(len(layers) / len(gpus))
     for i in range(len(layers)):
         layers[i] = MoveModule(layers[i].to(gpus[i // pergpu]))
-
-    # gather output back to cuda:0
-    old_forward = model.forward
-    def forward(*args, **kargs):
-        output = old_forward(*args, **kargs)
-        if isinstance(output, dict):
-            for k, v in output.items():
-                try:
-                    output[k] = v.to(0)
-                except AttributeError:
-                    pass
-        else:   # tuple
-            outputs = []
-            for v in output:
-                try:
-                    outputs.append(v.to(0))
-                except AttributeError:
-                    outputs.append(v)
-            output = tuple(outputs)
-        return output
-    
-    model.forward = forward
 
     model.gpus = gpus
 
