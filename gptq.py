@@ -114,7 +114,10 @@ class GPTQ:
 
                 if groupsize != -1:
                     if (i1 + i) % groupsize == 0:
-                        self.quantizer.find_params(W[:, (i1 + i):(i1 + i + groupsize)], weight=True)
+                        start = i1 + i
+                        end = start + groupsize
+                        if end < W.shape[-1]:
+                            self.quantizer.find_params(W[:, start:end], weight=True)
 
                     if ((i1 + i) // groupsize) - now_idx == -1:
                         scale.append(self.quantizer.scale)
