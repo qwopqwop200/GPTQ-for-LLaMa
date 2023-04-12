@@ -374,7 +374,7 @@ except:
     print('trioton not installed.')
 
 def matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq):
-    output = torch.empty((input.shape[0], qweight.shape[1]), device='cuda', dtype=torch.float16)
+    output = torch.empty((input.shape[0], qweight.shape[1]), device=input.device, dtype=torch.float16)
     grid = lambda META: (triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(qweight.shape[1], META['BLOCK_SIZE_N']),)
     matmul_248_kernel[grid](input, qweight, output,
                             scales, qzeros, g_idx,
@@ -387,7 +387,7 @@ def matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq):
 
 def transpose_matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq):
     output_dim = (qweight.shape[0] * 32) // bits
-    output = torch.empty((input.shape[0], output_dim), device='cuda', dtype=torch.float16)
+    output = torch.empty((input.shape[0], output_dim), device=input.device, dtype=torch.float16)
     grid = lambda META: (triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(output_dim, META['BLOCK_SIZE_K']),)
     transpose_matmul_248_kernel[grid](input, qweight, output,
                                       scales, qzeros, g_idx,
