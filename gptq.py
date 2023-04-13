@@ -158,7 +158,7 @@ class GPTQ:
             Q = Q.t()
         self.layer.weight.data = Q.reshape(self.layer.weight.shape).to(self.layer.weight.data.dtype)
         if DEBUG:
-            print(torch.sum((self.layer(self.inp1) - self.out1) ** 2))
+            print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
             
         if scale == []:
             scale.append(self.quantizer.scale)
