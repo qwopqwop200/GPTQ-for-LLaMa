@@ -4,13 +4,51 @@ import time
 import torch
 import torch.nn as nn
 import transformers
+import pdb
+from quant import *
+import matplotlib.pyplot as plt
 
-import quant
-
-DEBUG = False 
+DEBUG = True 
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
+
+class Observer:
+    def __init__(self, topk=5):
+        self.loss_list = []
+        self.topk = topk
+    
+    def submit(self, name:str, layerid: int, gptq, avg_error: float):
+        if avg_error < 1e-6:
+            return
+
+        item = (name, layerid, {
+            'gptq': gptq,
+            'avg_error': avg_error
+        })
+
+        if len(self.loss_list) < self.topk:
+            self.loss_list.append(item)
+            return
+
+        min_error = avg_error
+        min_idx = -1
+        for idx, data in enumerate(self.loss_list):
+            if min_error > data[2]['avg_error']:
+                min_idx = idx
+                min_error = data[2]['avg_error']
+
+        if min_idx >= 0:
+            self.loss_list[min_idx] = item
+
+    def print(self):
+        self.loss_list = sorted(self.loss_list, key=lambda s: s[2]['avg_error'])
+        for item in self.loss_list:
+            print('{} {} {}'.format(item[0], item[1], item[2]['avg_error']))
+        print('\n')
+    
+    def items(self):
+        return self.loss_list
 
 
 class GPTQ:
@@ -26,8 +64,9 @@ class GPTQ:
         self.columns = W.shape[1]
         self.H = torch.zeros((self.columns, self.columns), device=self.dev)
         self.nsamples = 0
-
+    
     def add_batch(self, inp, out):
+        # Hessian H = 2 X XT + λ I
         if DEBUG:
             self.inp1 = inp
             self.out1 = out
@@ -55,9 +94,23 @@ class GPTQ:
         # self.H += 2 / self.nsamples * inp.matmul(inp.t())
         self.H += inp.matmul(inp.t())
 
+    def plot(self, tensor, filename='/workspace/tensor/tensor.jpg', _bins=50):
+        tensor = tensor.flatten().cpu().numpy()
+        plt.figure(dpi=100)
+        n, bins, patches = plt.hist(tensor, bins=_bins)
+
+        print(n)
+        print(bins)
+        print(patches)
+
+        plt.plot(bins[:_bins],n,'--',color='#2ca02c')
+        plt.savefig(filename)
+
     def fasterquant(
-        self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False
+        self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False, name=''
     ):
+        self.layer.to(self.dev)
+
         W = self.layer.weight.data.clone()
         if isinstance(self.layer, nn.Conv2d):
             W = W.flatten(1)
@@ -71,7 +124,7 @@ class GPTQ:
             self.quantizer.find_params(W, weight=True)
 
         H = self.H
-        del self.H
+        # del self.H
         dead = torch.diag(H) == 0
         H[dead, dead] = 1
         W[:, dead] = 0
@@ -97,6 +150,9 @@ class GPTQ:
         zero = []
         now_idx = 1
 
+        # if name == 'self_attn.k_proj6':
+        #     pdb.set_trace()
+
         for i1 in range(0, self.columns, blocksize):
             i2 = min(i1 + blocksize, self.columns)
             count = i2 - i1
@@ -107,13 +163,19 @@ class GPTQ:
             Losses1 = torch.zeros_like(W1)
             Hinv1 = Hinv[i1:i2, i1:i2]
 
+
             for i in range(count):
                 w = W1[:, i]
-                d = Hinv1[i, i]
+                d = Hinv1[i, i] # assert d > EPSILON
 
                 if groupsize != -1:
                     if (i1 + i) % groupsize == 0:
-                        self.quantizer.find_params(W[:, (i1 + i):(i1 + i + groupsize)], weight=True)
+                        start = i1 + i
+                        end = start + groupsize
+                        if end <= W.shape[-1]:
+                            self.quantizer.find_params(W[:, start:end], weight=True)
+                        else:
+                            pdb.set_trace()
 
                     if ((i1 + i) // groupsize) - now_idx == -1:
                         scale.append(self.quantizer.scale)
@@ -130,20 +192,28 @@ class GPTQ:
                 W1[:, i:] -= err1.unsqueeze(1).matmul(Hinv1[i, i:].unsqueeze(0))
                 Err1[:, i] = err1
 
+                # if i1 + i < 256:
+                #     if name == 'self_attn.k_proj6':
+                #         self.plot(W1, filename='/workspace/tensor.k_proj6/tensor{}.jpg'.format(i1+i))
+                #     elif name == 'self_attn.k_proj1':
+                #         self.plot(W1, filename='/workspace/tensor.k_proj1/tensor{}.jpg'.format(i1+i))
+
             Q[:, i1:i2] = Q1
             Losses[:, i1:i2] = Losses1 / 2
 
             W[:, i2:] -= Err1.matmul(Hinv[i1:i2, i2:])
 
-            if DEBUG:
-                self.layer.weight.data[:, :i2] = Q[:, :i2]
-                self.layer.weight.data[:, i2:] = W[:, i2:]
-                print(torch.sum((self.layer(self.inp1) - self.out1) ** 2))
-                print(torch.sum(Losses))
+            # if DEBUG:
+                # self.layer.weight.data[:, :i2] = Q[:, :i2]
+                # self.layer.weight.data[:, i2:] = W[:, i2:]
+                # print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
+                # print(torch.sum(Losses))
 
         torch.cuda.synchronize()
-        print('time %.2f' % (time.time() - tick))
-        print('error', torch.sum(Losses).item())
+        # print('time %.2f' % (time.time() - tick))
+        error = torch.sum(Losses).item()
+        avg_error = error / (self.rows * self.columns)
+        # print('name {}, sum error {}, avg element error {}'.format(name, error, avg_error))
         
         groupsize = groupsize if groupsize != -1 else self.columns
         g_idx = [i // groupsize  for i in range(self.columns)]
@@ -156,6 +226,7 @@ class GPTQ:
         if isinstance(self.layer, transformers.Conv1D):
             Q = Q.t()
         self.layer.weight.data = Q.reshape(self.layer.weight.shape).to(self.layer.weight.data.dtype)
+
         if DEBUG:
             print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
             
@@ -164,8 +235,8 @@ class GPTQ:
             zero.append(self.quantizer.zero)
         scale = torch.cat(scale,dim=1)
         zero = torch.cat(zero,dim=1)
-        return scale,zero,g_idx
-            
+        return scale,zero,g_idx,avg_error
+
     def free(self):
         if DEBUG:
             self.inp1 = None
