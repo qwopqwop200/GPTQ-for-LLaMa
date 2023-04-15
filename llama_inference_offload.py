@@ -5,8 +5,7 @@ import torch.nn as nn
 
 from gptq import *
 from modelutils import *
-from quant import *
-
+import quant 
 from transformers import AutoTokenizer
 
 DEV = torch.device('cuda:0')
@@ -194,7 +193,7 @@ class Offload_LlamaModel(LlamaModel):
             attentions=all_self_attns,
         )
 
-def load_quant(model, checkpoint, wbits, groupsize, pre_layer, warmup_autotune=True):
+def load_quant(model, checkpoint, wbits, groupsize, pre_layer, fused_mlp = True, warmup_autotune=True):
     transformers.models.llama.modeling_llama.LlamaModel = Offload_LlamaModel
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
@@ -214,16 +213,21 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer, warmup_autotune=T
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    make_quant(model, layers, wbits, groupsize)
+    quant.make_quant_linear(model, layers, wbits, groupsize)
 
     print('Loading model ...')
     load_checkpoint_in_model(model, checkpoint, dtype='float16')
     model.seqlen = 2048
     
-    make_quant_attn(model)
-
+    quant.make_quant_attn(model)
+    if fused_mlp:
+        quant.make_fused_mlp(model)
+        
     if warmup_autotune:
-        autotune_warmup(model)
+        quant.autotune_warmup_linear(model)
+        if fused_mlp:
+            quant.autotune_warmup_fused(model)
+
     for i in range(pre_layer):
         model.model.layers[i].to(DEV)
     model.model.embed_tokens.to(DEV)
