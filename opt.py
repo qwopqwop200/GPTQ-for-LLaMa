@@ -230,7 +230,7 @@ def opt_pack(model, quantizers, wbits, groupsize):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
     quant.make_quant_linear(model, quantizers, wbits, groupsize)
-    qlayers = find_layers(model, [QuantLinear])
+    qlayers = find_layers(model, [quant.QuantLinear])
     print('Packing ...')
     for name in qlayers:
         print(name)
