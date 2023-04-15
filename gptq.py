@@ -5,8 +5,7 @@ import torch
 import torch.nn as nn
 import transformers
 
-from quant import *
-
+import quant
 
 DEBUG = False 
 
@@ -121,7 +120,7 @@ class GPTQ:
                         zero.append(self.quantizer.zero)
                         now_idx += 1
 
-                q = quantize(
+                q = quant.quantize(
                     w.unsqueeze(1), self.quantizer.scale, self.quantizer.zero, self.quantizer.maxq
                 ).flatten()
                 Q1[:, i] = q
