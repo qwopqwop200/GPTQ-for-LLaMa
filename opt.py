@@ -5,8 +5,7 @@ import torch.nn as nn
 
 from gptq import *
 from modelutils import *
-from quant import *
-
+import quant 
 
 def get_opt(model):
     import torch
@@ -81,7 +80,7 @@ def opt_sequential(model, dataloader, dev):
         gptq = {}	
         for name in subset:	
             gptq[name] = GPTQ(subset[name])	
-            gptq[name].quantizer = Quantizer()	
+            gptq[name].quantizer = quant.Quantizer()	
             gptq[name].quantizer.configure(	args.wbits, perchannel=True, sym=args.sym, mse=False, trits=args.trits	)	
             
         def add_batch(name):	
@@ -181,7 +180,7 @@ def opt_eval(model, testenc, dev):
         if args.nearest:
             subset = find_layers(layer)
             for name in subset:
-                quantizer = Quantizer()
+                quantizer = quant.Quantizer()
                 quantizer.configure(
                     args.wbits, perchannel=True, sym=args.sym, mse=False
                 )
@@ -230,7 +229,7 @@ def opt_eval(model, testenc, dev):
 def opt_pack(model, quantizers, wbits, groupsize):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, wbits, groupsize)
+    quant.make_quant_linear(model, quantizers, wbits, groupsize)
     qlayers = find_layers(model, [QuantLinear])
     print('Packing ...')
     for name in qlayers:
@@ -240,7 +239,7 @@ def opt_pack(model, quantizers, wbits, groupsize):
     print('Done.')
     return model
 
-def load_quant(model, checkpoint, wbits, groupsize = -1, warmup_autotune = True):
+def load_quant(model, checkpoint, wbits, groupsize = -1, eval = True,warmup_autotune = True):
     from transformers import OPTConfig, OPTForCausalLM 
     config = OPTConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -259,7 +258,7 @@ def load_quant(model, checkpoint, wbits, groupsize = -1, warmup_autotune = True)
     for name in ['model.decoder.project_out', 'model.decoder.project_in', 'lm_head']:
         if name in layers:
             del layers[name]
-    make_quant(model, layers, wbits, groupsize)
+    quant.make_quant_linear(model, layers, wbits, groupsize)
     
     del layers
 
@@ -271,7 +270,7 @@ def load_quant(model, checkpoint, wbits, groupsize = -1, warmup_autotune = True)
         model.load_state_dict(torch.load(checkpoint))
                 
     if warmup_autotune:
-        autotune_warmup(model)
+        quant.autotune_warmup_linear(model, transpose=not(eval))
     model.seqlen = model.config.max_position_embeddings
     print('Done.')
     return model
