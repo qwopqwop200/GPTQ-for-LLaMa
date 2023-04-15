@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from gptq import *
 from modelutils import *
-from quant import *
+import quant 
 
 from transformers import AutoTokenizer
 
@@ -23,7 +23,7 @@ def get_llama(model):
     model.seqlen = 2048
     return model
 
-def load_quant(model, checkpoint, wbits, groupsize, device, warmup_autotune = True):
+def load_quant(model, checkpoint, wbits, groupsize = -1, fused_mlp = True, eval=True, warmup_autotune = True):
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -37,26 +37,31 @@ def load_quant(model, checkpoint, wbits, groupsize, device, warmup_autotune = Tr
     torch.set_default_dtype(torch.half)
     model = LlamaForCausalLM(config)
     torch.set_default_dtype(torch.float)
-    model = model.eval()
+    if eval:
+        model = model.eval()
     layers = find_layers(model)
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    make_quant(model, layers, wbits, groupsize)
+    quant.make_quant_linear(model, layers, wbits, groupsize)
 
+    del layers
+    
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
         from safetensors.torch import load_file as safe_load
-        if device == -1:
-            device = "cpu"
-        model.load_state_dict(safe_load(checkpoint, device))
+        model.load_state_dict(safe_load(checkpoint), strict = False)
     else:
-        model.load_state_dict(torch.load(checkpoint))
+        model.load_state_dict(torch.load(checkpoint), strict = False)
         
-    make_quant_attn(model)
-
+    quant.make_quant_attn(model)
+    if eval and fused_mlp:
+        quant.make_fused_mlp(model)
+        
     if warmup_autotune:
-        autotune_warmup(model)
+        quant.autotune_warmup_linear(model,transpose=not(eval))
+        if eval and fused_mlp:
+            quant.autotune_warmup_fused(model)
     model.seqlen = 2048
     print('Done.')
 
