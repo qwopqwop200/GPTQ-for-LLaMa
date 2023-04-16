@@ -43,6 +43,7 @@ class QuantLlamaAttention(nn.Module):
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
         # [bsz, nh, t, hd]
 
+        is_causal = past_key_value is None
         if past_key_value is not None:
             # reuse k, v, self_attention
             key_states = torch.cat([past_key_value[0], key_states], dim=2)
@@ -51,7 +52,7 @@ class QuantLlamaAttention(nn.Module):
         past_key_value = (key_states, value_states) if use_cache else None
 
         with torch.backends.cuda.sdp_kernel(enable_math=False):
-            attn_output = F.scaled_dot_product_attention(query_states,key_states,value_states)
+            attn_output = F.scaled_dot_product_attention(query_states,key_states,value_states,is_causal=is_causal)
 
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
