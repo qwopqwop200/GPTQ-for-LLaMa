@@ -129,7 +129,7 @@ try:
     def silu(x):
         return x * tl.sigmoid(x)
 except:
-    print('trioton not installed.')
+    print('triton not installed.')
     
 class QuantLlamaMLP(nn.Module):
     def __init__(self,gate_proj,down_proj,up_proj,):
