@@ -92,8 +92,8 @@ def llama_sequential(model, dataloader, dev):
 
     quantizers = {}
     observer = Observer()
-    # for i in range(len(layers)):
-    for i in range(1):
+    for i in range(len(layers)):
+    # for i in range(1):
         layer = layers[i].to(dev)
         full = find_layers(layer)
         if args.true_sequential:
@@ -110,7 +110,7 @@ def llama_sequential(model, dataloader, dev):
             subset = {n: full[n] for n in names}
             gptq = {}
             for name in subset:
-                gptq[name] = GPTQ(subset[name])
+                gptq[name] = GPTQ(subset[name], observe=args.observe)
                 gptq[name].quantizer.configure(
                     args.wbits, perchannel=True, sym=args.sym, mse=False
                 )
@@ -130,14 +130,14 @@ def llama_sequential(model, dataloader, dev):
             for name in subset:
                 print('*' * 20)
                 print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
-                scale,zero,g_idx,avg_error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+
+                scale,zero,g_idx,error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
                 quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), args.wbits, args.groupsize)
 
                 if args.observe:
-                    observer.submit(name=name, layerid=i, gptq=gptq[name], avg_error=avg_error)
+                    observer.submit(name=name, layerid=i, gptq=gptq[name], error=error)
                 else:
                     gptq[name].free()
-                print('\n')
 
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids = position_ids)[0]
@@ -156,26 +156,31 @@ def llama_sequential(model, dataloader, dev):
             name = item[0]
             layerid = item[1]
             gptq = item[2]['gptq']
-            old_error = item[2]['avg_error']
+            error = item[2]['error']
             
             table = Texttable()
             table.header(['wbits', 'groupsize', 'error'])
             table.set_cols_dtype(['i', 'i', 'f'])
-            table.add_row([args.wbits, args.groupsize, old_error])
+            table.add_row([args.wbits, args.groupsize, error])
 
             print('Optimizing {} {} ..'.format(name, layerid))
             for wbits, groupsize in conditions:
 
-                gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
-                scale,zero,g_idx,new_error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order, name=name)
-
-                table.add_row([wbits, groupsize, new_error])
-                quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
-
-                if new_error < 1e-6:
+                if error < 500:
+                    # if error small enough, skip
                     break
+
+                gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
+
+                import pdb
+                # pdb.set_trace()
+                scale,zero,g_idx,error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order)
+
+                table.add_row([wbits, groupsize, error])
+                quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
                 
             print(table.draw())
+            gptq.layer.to('cpu')
             gptq.free()
 
     model.config.use_cache = use_cache
@@ -278,21 +283,21 @@ def llama_eval(model, testenc, dev):
     model.config.use_cache = use_cache
 
 # TODO: perform packing on GPU
-def llama_pack(model, quantizers, wbits, groupsize):
+def llama_pack(model, quantizers):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    quant.make_quant_linear(model, quantizers, wbits, groupsize)
+    quant.make_quant_linear(model, quantizers)
     qlayers = find_layers(model, [quant.QuantLinear])
     print('Packing ...')
     for name in qlayers:
         print(name)
         quantizers[name],scale,zero,g_idx,wbits,groupsize = quantizers[name]
-        qlayers[name].pack(layers[name], scale, zero, g_idx,wbits, groupsize)
+        qlayers[name].pack(layers[name], scale, zero, g_idx=g_idx, wbits=wbits, groupsize=groupsize)
     print('Done.')
     return model
 
 
-def load_quant(model, checkpoint, wbits, groupsize = -1, fused_mlp = True, eval=True, warmup_autotune = True):
+def load_quant(model, checkpoint, fused_mlp = True, eval=True, warmup_autotune = True):
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -312,7 +317,7 @@ def load_quant(model, checkpoint, wbits, groupsize = -1, fused_mlp = True, eval=
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    quant.make_quant_linear(model, layers, wbits, groupsize)
+    quant.make_quant_linear(model, layers)
 
     del layers
     
@@ -511,7 +516,7 @@ if __name__ == '__main__':
         args.load = args.load.as_posix()
     
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
+        model = load_quant(args.model, args.load)
     else:
         model = get_llama(args.model)
         model.eval()
@@ -547,11 +552,11 @@ if __name__ == '__main__':
             llama_eval(model, testloader, DEV)
 
     if args.save:
-        llama_pack(model, quantizers, args.wbits, args.groupsize)
+        llama_pack(model, quantizers)
         torch.save(model.state_dict(), args.save) 
 
     if args.save_safetensors:
-        llama_pack(model, quantizers, args.wbits, args.groupsize)
+        llama_pack(model, quantizers)
         from safetensors.torch import save_file as safe_save
         state_dict = model.state_dict()
         state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}

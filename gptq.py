@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import transformers
 import quant
-import texttable
+from texttable import Texttable
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -15,35 +15,39 @@ class Observer:
         self.loss_list = []
         self.topk = topk
     
-    def submit(self, name:str, layerid: int, gptq, avg_error: float):
-        if avg_error < 1e-6:
-            return
+    def submit(self, name:str, layerid: int, gptq, error: float):
 
         item = (name, layerid, {
             'gptq': gptq,
-            'avg_error': avg_error
+            'error': error
         })
 
         if len(self.loss_list) < self.topk:
             self.loss_list.append(item)
             return
 
-        min_error = avg_error
+        min_error = error
         min_idx = -1
         for idx, data in enumerate(self.loss_list):
-            if min_error > data[2]['avg_error']:
+            if min_error > data[2]['error']:
                 min_idx = idx
-                min_error = data[2]['avg_error']
+                min_error = data[2]['error']
 
         if min_idx >= 0:
             self.loss_list[min_idx] = item
 
     def print(self):
-        self.loss_list = sorted(self.loss_list, key=lambda s: s[2]['avg_error'])
+        self.loss_list = sorted(self.loss_list, key=lambda s: s[2]['error'], reverse=True)
+        
+        table = Texttable()
+
+        table.header(['name', 'error'])
+        table.set_cols_dtype(['t', 'f'])
+
         for item in self.loss_list:
-            print('{} {} {}'.format(item[0], item[1], item[2]['avg_error']))
-        print('\n')
-    
+            table.add_row([f"{item[0]}.{item[1]}", item[2]['error']])
+        print(table.draw())
+
     def items(self):
         return self.loss_list
 
@@ -178,9 +182,8 @@ class GPTQ:
 
 
         torch.cuda.synchronize()
-        print('time %.2f' % (time.time() - tick))
         error = torch.sum(Losses).item()
-        avg_error = error / (self.rows * self.columns)
+        print('time %.2f, error %.2f' % (time.time() - tick, error))
         
         groupsize = groupsize if groupsize != -1 else self.columns
         g_idx = [i // groupsize  for i in range(self.columns)]
@@ -194,15 +197,15 @@ class GPTQ:
             Q = Q.t()
         self.layer.weight.data = Q.reshape(self.layer.weight.shape).to(self.layer.weight.data.dtype)
 
-        if self.observe:
-            print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
+        # if self.observe:
+        #     print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
             
         if scale == []:
             scale.append(self.quantizer.scale)
             zero.append(self.quantizer.zero)
         scale = torch.cat(scale,dim=1)
         zero = torch.cat(zero,dim=1)
-        return scale,zero,g_idx,avg_error
+        return scale,zero,g_idx,error
 
     def free(self):
         if self.observe:

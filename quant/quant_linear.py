@@ -251,10 +251,12 @@ class QuantLinear(nn.Module):
             raise NotImplementedError("Only 2,4,8 bits are supported.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
-        self.bits = bits
-        self.maxq = 2 ** self.bits - 1
-        self.groupsize = groupsize if groupsize != -1 else infeatures
         
+        self.register_buffer('bits', torch.tensor(bits, dtype=torch.int32))
+        self.register_buffer('groupsize', torch.tensor(groupsize if groupsize != -1 else infeatures, dtype=torch.int32))
+        
+        self.maxq = None
+
         self.register_buffer('qweight', torch.zeros((infeatures // 32 * self.bits, outfeatures), dtype=torch.int32))
         self.register_buffer('qzeros', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures // 32 * self.bits), dtype=torch.int32))
         self.register_buffer('scales', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures), dtype=torch.float16))
@@ -264,9 +266,16 @@ class QuantLinear(nn.Module):
         else:
             self.bias = None
         
-    def pack(self, linear, scales, zeros, g_idx = None):
+    def pack(self, linear, scales, zeros, g_idx = None, wbits = None, groupsize = None):
+
+        if wbits is not None:
+            self.bits.fill_(wbits) 
+        if groupsize is not None:
+            self.groupsize.fill_(groupsize)
         self.g_idx = g_idx.clone() if g_idx is not None else self.g_idx
         
+        bits = self.bits.item()
+
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
         scale_zeros = zeros * scales
@@ -280,14 +289,14 @@ class QuantLinear(nn.Module):
         intweight = torch.cat(intweight,dim=1)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
-        qweight = np.zeros((intweight.shape[0] // 32 * self.bits, intweight.shape[1]), dtype=np.uint32)
+        qweight = np.zeros((intweight.shape[0] // 32 * bits, intweight.shape[1]), dtype=np.uint32)
         i = 0
         row = 0
         while row < qweight.shape[0]:
-            if self.bits in [2,4,8]:
-                for j in range(i, i + (32//self.bits)):
-                    qweight[row] |= intweight[j] << (self.bits * (j - i))
-                i += 32//self.bits
+            if bits in [2,4,8]:
+                for j in range(i, i + (32//bits)):
+                    qweight[row] |= intweight[j] << (bits * (j - i))
+                i += 32//bits
                 row += 1
             else:
                 raise NotImplementedError("Only 2,4,8 bits are supported.")
@@ -297,14 +306,14 @@ class QuantLinear(nn.Module):
         
         zeros -= 1;
         zeros = zeros.numpy().astype(np.uint32)
-        qzeros = np.zeros((zeros.shape[0], zeros.shape[1] // 32 * self.bits), dtype=np.uint32)
+        qzeros = np.zeros((zeros.shape[0], zeros.shape[1] // 32 * bits), dtype=np.uint32)
         i = 0
         col = 0
         while col < qzeros.shape[1]:
-            if self.bits in [2,4,8]:
-                for j in range(i, i + (32//self.bits)):
-                    qzeros[:, col] |= zeros[:, j] << (self.bits * (j - i))
-                i += 32//self.bits
+            if bits in [2,4,8]:
+                for j in range(i, i + (32//bits)):
+                    qzeros[:, col] |= zeros[:, j] << (bits * (j - i))
+                i += 32//bits
                 col += 1
             else:
                 raise NotImplementedError("Only 2,4,8 bits are supported.")
@@ -314,12 +323,17 @@ class QuantLinear(nn.Module):
         
     def forward(self, x):
         out_shape = x.shape[:-1] + (self.outfeatures, )
+
+        if self.maxq is None:
+            bits = self.bits.item()
+            self.maxq = 2 ** bits - 1
+            
         out = QuantLinearFunction.apply(x.reshape(-1,x.shape[-1]), self.qweight, self.scales, 
                                         self.qzeros, self.g_idx, self.bits, self.maxq)
         out = out + self.bias if self.bias is not None else out  
         return out.reshape(out_shape)
         
-def make_quant_linear(module, names, bits, groupsize, name=''):
+def make_quant_linear(module, names, bits=4, groupsize=-1, name=''):
     if isinstance(module, QuantLinear):
         return
     for attr in dir(module):

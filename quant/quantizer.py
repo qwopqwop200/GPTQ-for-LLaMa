@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import math
-import pdb
 
 def quantize(x, scale, zero, maxq):
     if maxq < 0:
@@ -34,6 +33,7 @@ class Quantizer(nn.Module):
         self.maxshrink = maxshrink 
         if trits:
             self.maxq = torch.tensor(-1)
+        self.scale = torch.zeros_like(self.scale)
         
     def find_params(self, x, weight=False):
         dev = x.device
