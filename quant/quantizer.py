@@ -22,7 +22,7 @@ class Quantizer(nn.Module):
         self,
         bits, perchannel=False, sym=True, 
         mse=False, norm=2.4, grid=100, maxshrink=.8,
-        trits=False, keep_minmax=False
+        trits=False
         ):
         
         self.maxq = torch.tensor(2 ** bits - 1)
@@ -35,16 +35,11 @@ class Quantizer(nn.Module):
         if trits:
             self.maxq = torch.tensor(-1)
         
-        self.keep_minmax = keep_minmax
-        self.min = None
-        self.max = None
-        
     def find_params(self, x, weight=False):
         dev = x.device
         self.maxq = self.maxq.to(dev)
 
         shape = x.shape
-
         if self.perchannel:
             if weight:
                 x = x.flatten(1)
@@ -122,10 +117,6 @@ class Quantizer(nn.Module):
         if len(shape) == 2:
             self.scale = self.scale.unsqueeze(0)
             self.zero = self.zero.unsqueeze(0)
-
-        if self.keep_minmax:
-            self.min = xmin
-            self.max = xmax
 
     def quantize(self, x):
         if self.ready():

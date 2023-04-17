@@ -5,11 +5,11 @@ import toml
 import numpy as np
 import torch
 import torch.nn as nn
-import pdb
 
 from gptq import *
 from modelutils import *
-import quant 
+import quant
+from texttable import Texttable
 
 def get_llama(model):
     import torch
@@ -92,8 +92,8 @@ def llama_sequential(model, dataloader, dev):
 
     quantizers = {}
     observer = Observer()
-    for i in range(len(layers)):
-    # for i in range(1):
+    # for i in range(len(layers)):
+    for i in range(1):
         layer = layers[i].to(dev)
         full = find_layers(layer)
         if args.true_sequential:
@@ -111,12 +111,8 @@ def llama_sequential(model, dataloader, dev):
             gptq = {}
             for name in subset:
                 gptq[name] = GPTQ(subset[name])
-                # gptq[name].quantizer = quant.Quantizer()
-                # qptq[name].input_quantizer.configure(
-                #     8, perchannel=False, sym=False, mse=False
-                # )
                 gptq[name].quantizer.configure(
-                    args.wbits, perchannel=True, sym=args.sym, mse=False, keep_minmax=False
+                    args.wbits, perchannel=True, sym=args.sym, mse=False
                 )
             
             def add_batch(name):
@@ -135,8 +131,6 @@ def llama_sequential(model, dataloader, dev):
                 print('*' * 20)
                 print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
                 scale,zero,g_idx,avg_error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
-                # print('submit {} {}'.format(name, i))
-
                 quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), args.wbits, args.groupsize)
 
                 if args.observe:
@@ -164,20 +158,24 @@ def llama_sequential(model, dataloader, dev):
             gptq = item[2]['gptq']
             old_error = item[2]['avg_error']
             
-            print('*' * 20)
-            print('optimizing {} {} error {}..'.format(name, layerid, old_error))
+            table = Texttable()
+            table.header(['wbits', 'groupsize', 'error'])
+            table.set_cols_dtype(['i', 'i', 'f'])
+            table.add_row([args.wbits, args.groupsize, old_error])
+
+            print('Optimizing {} {} ..'.format(name, layerid))
             for wbits, groupsize in conditions:
 
                 gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
                 scale,zero,g_idx,new_error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order, name=name)
 
-                print('{} {} -> error {}'.format(wbits, groupsize, new_error))
+                table.add_row([wbits, groupsize, new_error])
                 quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
 
                 if new_error < 1e-6:
                     break
-
-            gptq.layer.to('cpu')
+                
+            print(table.draw())
             gptq.free()
 
     model.config.use_cache = use_cache

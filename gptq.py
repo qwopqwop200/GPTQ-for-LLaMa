@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import transformers
 import quant
+import texttable
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -110,7 +111,8 @@ class GPTQ:
             self.quantizer.find_params(W, weight=True)
 
         H = self.H
-        # del self.H
+        if not self.observe:
+            del self.H
         dead = torch.diag(H) == 0
         H[dead, dead] = 1
         W[:, dead] = 0
@@ -146,7 +148,6 @@ class GPTQ:
             Losses1 = torch.zeros_like(W1)
             Hinv1 = Hinv[i1:i2, i1:i2]
 
-
             for i in range(count):
                 w = W1[:, i]
                 d = Hinv1[i, i]
@@ -177,6 +178,7 @@ class GPTQ:
 
 
         torch.cuda.synchronize()
+        print('time %.2f' % (time.time() - tick))
         error = torch.sum(Losses).item()
         avg_error = error / (self.rows * self.columns)
         
