@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import transformers
 import pdb
-from quant import *
+import quant
 import matplotlib.pyplot as plt
 
 DEBUG = True 
