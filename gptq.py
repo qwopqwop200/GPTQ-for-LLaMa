@@ -4,11 +4,7 @@ import time
 import torch
 import torch.nn as nn
 import transformers
-import pdb
 import quant
-import matplotlib.pyplot as plt
-
-DEBUG = True 
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
@@ -52,7 +48,7 @@ class Observer:
 
 
 class GPTQ:
-    def __init__(self, layer):
+    def __init__(self, layer, observe=False):
         self.layer = layer
         self.dev = self.layer.weight.device
         W = layer.weight.data.clone()
@@ -64,10 +60,12 @@ class GPTQ:
         self.columns = W.shape[1]
         self.H = torch.zeros((self.columns, self.columns), device=self.dev)
         self.nsamples = 0
-    
+        self.quantizer = quant.Quantizer()
+        self.observe = observe
+
     def add_batch(self, inp, out):
         # Hessian H = 2 X XT + λ I
-        if DEBUG:
+        if self.observe:
             self.inp1 = inp
             self.out1 = out
         if len(inp.shape) == 2:
@@ -94,20 +92,8 @@ class GPTQ:
         # self.H += 2 / self.nsamples * inp.matmul(inp.t())
         self.H += inp.matmul(inp.t())
 
-    def plot(self, tensor, filename='/workspace/tensor/tensor.jpg', _bins=50):
-        tensor = tensor.flatten().cpu().numpy()
-        plt.figure(dpi=100)
-        n, bins, patches = plt.hist(tensor, bins=_bins)
-
-        print(n)
-        print(bins)
-        print(patches)
-
-        plt.plot(bins[:_bins],n,'--',color='#2ca02c')
-        plt.savefig(filename)
-
     def fasterquant(
-        self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False, name=''
+        self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False
     ):
         self.layer.to(self.dev)
 
@@ -150,9 +136,6 @@ class GPTQ:
         zero = []
         now_idx = 1
 
-        # if name == 'self_attn.k_proj6':
-        #     pdb.set_trace()
-
         for i1 in range(0, self.columns, blocksize):
             i2 = min(i1 + blocksize, self.columns)
             count = i2 - i1
@@ -166,16 +149,11 @@ class GPTQ:
 
             for i in range(count):
                 w = W1[:, i]
-                d = Hinv1[i, i] # assert d > EPSILON
+                d = Hinv1[i, i]
 
                 if groupsize != -1:
                     if (i1 + i) % groupsize == 0:
-                        start = i1 + i
-                        end = start + groupsize
-                        if end <= W.shape[-1]:
-                            self.quantizer.find_params(W[:, start:end], weight=True)
-                        else:
-                            pdb.set_trace()
+                        self.quantizer.find_params(W[:, (i1 + i):(i1 + i + groupsize)], weight=True)
 
                     if ((i1 + i) // groupsize) - now_idx == -1:
                         scale.append(self.quantizer.scale)
@@ -192,28 +170,15 @@ class GPTQ:
                 W1[:, i:] -= err1.unsqueeze(1).matmul(Hinv1[i, i:].unsqueeze(0))
                 Err1[:, i] = err1
 
-                # if i1 + i < 256:
-                #     if name == 'self_attn.k_proj6':
-                #         self.plot(W1, filename='/workspace/tensor.k_proj6/tensor{}.jpg'.format(i1+i))
-                #     elif name == 'self_attn.k_proj1':
-                #         self.plot(W1, filename='/workspace/tensor.k_proj1/tensor{}.jpg'.format(i1+i))
-
             Q[:, i1:i2] = Q1
             Losses[:, i1:i2] = Losses1 / 2
 
             W[:, i2:] -= Err1.matmul(Hinv[i1:i2, i2:])
 
-            # if DEBUG:
-                # self.layer.weight.data[:, :i2] = Q[:, :i2]
-                # self.layer.weight.data[:, i2:] = W[:, i2:]
-                # print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
-                # print(torch.sum(Losses))
 
         torch.cuda.synchronize()
-        # print('time %.2f' % (time.time() - tick))
         error = torch.sum(Losses).item()
         avg_error = error / (self.rows * self.columns)
-        # print('name {}, sum error {}, avg element error {}'.format(name, error, avg_error))
         
         groupsize = groupsize if groupsize != -1 else self.columns
         g_idx = [i // groupsize  for i in range(self.columns)]
@@ -227,7 +192,7 @@ class GPTQ:
             Q = Q.t()
         self.layer.weight.data = Q.reshape(self.layer.weight.shape).to(self.layer.weight.data.dtype)
 
-        if DEBUG:
+        if self.observe:
             print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
             
         if scale == []:
@@ -238,7 +203,7 @@ class GPTQ:
         return scale,zero,g_idx,avg_error
 
     def free(self):
-        if DEBUG:
+        if self.observe:
             self.inp1 = None
             self.out1 = None
         self.H = None

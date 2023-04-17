@@ -5,6 +5,7 @@ import toml
 import numpy as np
 import torch
 import torch.nn as nn
+import pdb
 
 from gptq import *
 from modelutils import *
@@ -110,11 +111,14 @@ def llama_sequential(model, dataloader, dev):
             gptq = {}
             for name in subset:
                 gptq[name] = GPTQ(subset[name])
-                gptq[name].quantizer = quant.Quantizer()
+                # gptq[name].quantizer = quant.Quantizer()
+                # qptq[name].input_quantizer.configure(
+                #     8, perchannel=False, sym=False, mse=False
+                # )
                 gptq[name].quantizer.configure(
-                    args.wbits, perchannel=True, sym=args.sym, mse=False
+                    args.wbits, perchannel=True, sym=args.sym, mse=False, keep_minmax=False
                 )
-                
+            
             def add_batch(name):
                 def tmp(_, inp, out):
                     gptq[name].add_batch(inp[0].data, out.data)
@@ -129,8 +133,8 @@ def llama_sequential(model, dataloader, dev):
 
             for name in subset:
                 print('*' * 20)
-                print(f'Quantizing {name} in layer {i}/{len(layers)}...')
-                scale,zero,g_idx,avg_error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order, name=name)
+                print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
+                scale,zero,g_idx,avg_error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
                 # print('submit {} {}'.format(name, i))
 
                 quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), args.wbits, args.groupsize)
@@ -161,13 +165,13 @@ def llama_sequential(model, dataloader, dev):
             old_error = item[2]['avg_error']
             
             print('*' * 20)
-            print('{} {} error {}'.format(name, layerid, old_error))
+            print('optimizing {} {} error {}..'.format(name, layerid, old_error))
             for wbits, groupsize in conditions:
 
                 gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
                 scale,zero,g_idx,new_error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order, name=name)
 
-                print('{} {} => error {}'.format(wbits, groupsize, new_error))
+                print('{} {} -> error {}'.format(wbits, groupsize, new_error))
                 quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
 
                 if new_error < 1e-6:
@@ -178,7 +182,6 @@ def llama_sequential(model, dataloader, dev):
 
     model.config.use_cache = use_cache
     
-    print(quantizers.keys())
     return quantizers
 
 @torch.no_grad()
@@ -286,52 +289,9 @@ def llama_pack(model, quantizers, wbits, groupsize):
     for name in qlayers:
         print(name)
         quantizers[name],scale,zero,g_idx,wbits,groupsize = quantizers[name]
-        qlayers[name].pack(layers[name], scale, zero, g_idx)
+        qlayers[name].pack(layers[name], scale, zero, g_idx,wbits, groupsize)
     print('Done.')
     return model
-
-
-def export_quant_table(quantizers, quant_dir):
-    # quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),layerid, wbits, groupsize)
-
-    table = {}
-    import pdb
-    # quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
-    for key, value in quantizers.items():
-        quantizer = value[0]
-
-        dump = dict()
-
-        sym = quantizer.sym
-        if not sym:
-            dump['zero'] = value[2].flatten().numpy().astype(np.int32).tolist()
-            dump['zero_shape'] = list(value[2].shape)
-        
-        dump['scale'] = value[1].flatten().numpy().tolist()
-        dump['scale_shape'] = list(value[1].shape)
-
-        dump['wbits'] = value[4]
-        dump['groupsize'] = value[5]
-        if value[5] > 0:
-            group_ids = value[3]
-            dump['group_ids'] = group_ids.flatten().numpy().tolist()
-            dump['group_ids_shape'] = list(group_ids.shape)
-
-        dump['sym'] = sym
-        dump['perchannel'] = quantizer.perchannel
-        
-        decoder_id = 'decoder-{}'.format(key.split('.')[2])
-        if decoder_id not in table:
-            table[decoder_id] = {}
-        table[decoder_id][key] = dump
-
-    # for k, value in table:
-    if not os.path.exists(quant_dir):
-        os.mkdir(quant_dir)
-    
-    for key, value in table.items():
-        with open(os.path.join(quant_dir, '{}.toml'.format(key)), 'w') as f:
-            toml.dump(value, f)
 
 
 def load_quant(model, checkpoint, wbits, groupsize = -1, fused_mlp = True, eval=True, warmup_autotune = True):
@@ -543,11 +503,7 @@ if __name__ == '__main__':
         help='Whether to use the new PTB and C4 eval'
     )
     parser.add_argument(
-        '--quant-directory', type=str, default=None,
-        help='Quant table directory. `None` means no export by default.'
-    )
-    parser.add_argument(
-        '--observe', type=bool, default=False,
+        '--observe', action='store_true',
         help='Auto downgrade bad layer precision to higher level, for example int2 to int4'
     )
     
@@ -591,9 +547,6 @@ if __name__ == '__main__':
             )
             print(dataset)
             llama_eval(model, testloader, DEV)
-
-    if args.quant_directory is not None:
-        export_quant_table(quantizers, args.quant_directory)
 
     if args.save:
         llama_pack(model, quantizers, args.wbits, args.groupsize)
