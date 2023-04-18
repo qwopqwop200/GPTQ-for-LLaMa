@@ -283,21 +283,20 @@ def llama_eval(model, testenc, dev):
     model.config.use_cache = use_cache
 
 # TODO: perform packing on GPU
-def llama_pack(model, quantizers):
+def llama_pack(model, quantizers, wbits, groupsize):
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    quant.make_quant_linear(model, quantizers)
+    quant.make_quant_linear(model, quantizers, wbits, groupsize)
     qlayers = find_layers(model, [quant.QuantLinear])
     print('Packing ...')
     for name in qlayers:
         print(name)
-        quantizers[name],scale,zero,g_idx,wbits,groupsize = quantizers[name]
-        qlayers[name].pack(layers[name], scale, zero, g_idx=g_idx, wbits=wbits, groupsize=groupsize)
+        quantizers[name],scale,zero,g_idx = quantizers[name]
+        qlayers[name].pack(layers[name], scale, zero, g_idx)
     print('Done.')
     return model
 
-
-def load_quant(model, checkpoint, fused_mlp = True, eval=True, warmup_autotune = True):
+def load_quant(model, checkpoint, wbits, groupsize = -1, fused_mlp = True, eval=True, warmup_autotune = True):
     from transformers import LlamaConfig, LlamaForCausalLM 
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
@@ -317,7 +316,7 @@ def load_quant(model, checkpoint, fused_mlp = True, eval=True, warmup_autotune =
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    quant.make_quant_linear(model, layers)
+    quant.make_quant_linear(model, layers, wbits, groupsize)
 
     del layers
     
