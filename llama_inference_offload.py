@@ -1,4 +1,3 @@
-import time
 
 import torch
 import torch.nn as nn
@@ -9,11 +8,9 @@ from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, ge
 import quant 
 from transformers import AutoTokenizer
 
-import copy 
 from transformers.models.llama.modeling_llama import LlamaModel,LlamaConfig
 from transformers.modeling_outputs import BaseModelOutputWithPast
 from typing import List, Optional, Tuple, Union
-import time
 from accelerate import cpu_offload_with_hook,load_checkpoint_in_model
 class Offload_LlamaModel(LlamaModel):
     def __init__(self, config: LlamaConfig):

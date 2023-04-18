@@ -1,6 +1,4 @@
 import time
-import pdb
-import os
 import toml
 import numpy as np
 import torch
@@ -172,8 +170,6 @@ def llama_sequential(model, dataloader, dev):
 
                 gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
 
-                import pdb
-                # pdb.set_trace()
                 scale,zero,g_idx,error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order)
 
                 table.add_row([wbits, groupsize, error])
