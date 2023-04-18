@@ -138,6 +138,11 @@ It takes about 180 seconds to generate 45 tokens(5->50 tokens) on single RTX3090
 ```
 Basically, 4-bit quantization and 128 groupsize are recommended.
 
+You can also export quantization parameters with toml+numpy format.
+```
+CUDA_VISIBLE_DEVICES=0 python llama.py ${MODEL_DIR} c4 --wbits 4 --true-sequential --act-order --groupsize 128 --quant-directory ${TOML_DIR}
+```
+
 # Acknowledgements
 This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)
 

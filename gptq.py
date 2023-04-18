@@ -47,6 +47,7 @@ class Observer:
         for item in self.loss_list:
             table.add_row([f"{item[0]}.{item[1]}", item[2]['error']])
         print(table.draw())
+        print('\n')
 
     def items(self):
         return self.loss_list

@@ -17,8 +17,8 @@ def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
 
 
 def gen_conditions(_wbits, _groupsize):
-    groupsize = _groupsize
     wbits = _wbits
+    groupsize = _groupsize
     conditions = []
     while True:
         if wbits >= 8:

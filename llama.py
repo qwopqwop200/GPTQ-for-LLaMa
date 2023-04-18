@@ -70,7 +70,6 @@ def llama_sequential(model, dataloader, dev):
     quantizers = {}
     observer = Observer()
     for i in range(len(layers)):
-    # for i in range(1):
         layer = layers[i].to(dev)
         full = find_layers(layer)
         if args.true_sequential:
@@ -105,7 +104,6 @@ def llama_sequential(model, dataloader, dev):
                 h.remove()
 
             for name in subset:
-                print('*' * 20)
                 print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
 
                 scale,zero,g_idx,error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
@@ -134,6 +132,7 @@ def llama_sequential(model, dataloader, dev):
             layerid = item[1]
             gptq = item[2]['gptq']
             error = item[2]['error']
+            target = error / 2
             
             table = Texttable()
             table.header(['wbits', 'groupsize', 'error'])
@@ -143,8 +142,8 @@ def llama_sequential(model, dataloader, dev):
             print('Optimizing {} {} ..'.format(name, layerid))
             for wbits, groupsize in conditions:
 
-                if error < 500:
-                    # if error small enough, skip
+                if error < target:
+                    # if error dropped 50%, skip
                     break
 
                 gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
@@ -155,6 +154,7 @@ def llama_sequential(model, dataloader, dev):
                 quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
                 
             print(table.draw())
+            print('\n')
             gptq.layer.to('cpu')
             gptq.free()
 
@@ -266,7 +266,7 @@ def llama_pack(model, quantizers, wbits, groupsize):
     print('Packing ...')
     for name in qlayers:
         print(name)
-        quantizers[name],scale,zero,g_idx = quantizers[name]
+        quantizers[name],scale,zero,g_idx,_,_ = quantizers[name]
         qlayers[name].pack(layers[name], scale, zero, g_idx)
     print('Done.')
     return model
@@ -493,7 +493,7 @@ if __name__ == '__main__':
         args.load = args.load.as_posix()
     
     if args.load:
-        model = load_quant(args.model, args.load)
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
     else:
         model = get_llama(args.model)
         model.eval()
@@ -532,11 +532,11 @@ if __name__ == '__main__':
         export_quant_table(quantizers, args.quant_directory)
 
     if not args.observe and args.save:
-        llama_pack(model, quantizers)
+        llama_pack(model, quantizers, args.wbits, args.groupsize)
         torch.save(model.state_dict(), args.save) 
 
     if not args.observe and args.save_safetensors:
-        llama_pack(model, quantizers)
+        llama_pack(model, quantizers, args.wbits, args.groupsize)
         from safetensors.torch import save_file as safe_save
         state_dict = model.state_dict()
         state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
