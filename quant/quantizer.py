@@ -32,9 +32,8 @@ class Quantizer(nn.Module):
         self.grid = grid
         self.maxshrink = maxshrink 
         if trits:
-            self.maxq = torch.tensor(-1)
-        self.scale = torch.zeros_like(self.scale)
-        
+            self.maxq = torch.tensor(-1) 
+
     def find_params(self, x, weight=False):
         dev = x.device
         self.maxq = self.maxq.to(dev)
