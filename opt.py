@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import argparse
 
-from gptq import *
+from gptq import GPTQ
 from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders
 import quant 
 

@@ -4,8 +4,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from gptq import *
-from utils import find_layers, DEV
+from gptq import GPTQ, Observer
+from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders
 import quant
 from texttable import Texttable
 
