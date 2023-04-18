@@ -1,16 +1,15 @@
+import argparse
 import time
-import toml
 import numpy as np
 import torch
 import torch.nn as nn
+import quant
 
 from gptq import GPTQ, Observer
-from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders
-import quant
+from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders, export_quant_table, gen_conditions
 from texttable import Texttable
 
 def get_llama(model):
-    import torch
     def skip(*args, **kwargs):
         pass
     torch.nn.init.kaiming_uniform_ = skip
@@ -20,26 +19,6 @@ def get_llama(model):
     model = LlamaForCausalLM.from_pretrained(model, torch_dtype='auto')
     model.seqlen = 2048
     return model
-
-def gen_conditions(_wbits, _groupsize):
-    # first try smaller groupsize, then try double wbits
-
-    groupsize = _groupsize
-    wbits = _wbits
-    conditions = []
-    while True:
-        if wbits >= 8:
-            if groupsize == -1 or groupsize == 32:
-                break
-        
-        if groupsize > 32:
-            groupsize /= 2
-        else:
-            wbits *= 2
-            groupsize = _groupsize
-        
-        conditions.append((int(wbits), int(groupsize)))
-    return conditions
 
 @torch.no_grad()
 def llama_sequential(model, dataloader, dev):
@@ -500,7 +479,12 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--observe', action='store_true',
-        help='Auto downgrade bad layer precision to higher level, for example int2 to int4'
+        help='Auto upgrade layer precision to higher precision, for example int2 to int4, groupsize 128 to 64. \
+            When this feature enabled, `--save` or `--save_safetensors` would be disable.'
+    )
+    parser.add_argument(
+        '--quant-directory', type=str, default=None,
+        help='Specify the directory for export quantization parameters to toml format. `None` means no export by default.'
     )
     
     args = parser.parse_args()
@@ -543,12 +527,15 @@ if __name__ == '__main__':
             )
             print(dataset)
             llama_eval(model, testloader, DEV)
+    
+    if args.quant_directory is not None:
+        export_quant_table(quantizers, args.quant_directory)
 
-    if args.save:
+    if not args.observe and args.save:
         llama_pack(model, quantizers)
         torch.save(model.state_dict(), args.save) 
 
-    if args.save_safetensors:
+    if not args.observe and args.save_safetensors:
         llama_pack(model, quantizers)
         from safetensors.torch import save_file as safe_save
         state_dict = model.state_dict()
