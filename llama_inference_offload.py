@@ -4,11 +4,11 @@ import torch
 import torch.nn as nn
 
 from gptq import *
-from modelutils import *
+import argparse
+from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders
 import quant 
 from transformers import AutoTokenizer
 
-DEV = torch.device('cuda:0')
 import copy 
 from transformers.models.llama.modeling_llama import LlamaModel,LlamaConfig
 from transformers.modeling_outputs import BaseModelOutputWithPast
@@ -238,9 +238,6 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer, fused_mlp = True,
     return model
 
 if __name__ == '__main__':
-    import argparse
-    from datautils import *
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument(

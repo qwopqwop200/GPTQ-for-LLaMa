@@ -2,9 +2,10 @@ import time
 
 import torch
 import torch.nn as nn
+import argparse
 
 from gptq import *
-from modelutils import *
+from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders
 import quant 
 
 def get_opt(model):
@@ -361,8 +362,6 @@ def benchmark(model, input_ids, check=False):
 
 
 if __name__ == '__main__':
-    import argparse
-    from datautils import *
 
     parser = argparse.ArgumentParser()
 

@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 from gptq import *
-from modelutils import *
+from utils import find_layers, DEV
 import quant
 from texttable import Texttable
 
@@ -423,8 +423,6 @@ def benchmark(model, input_ids, check=False):
 
 
 if __name__ == '__main__':
-    import argparse
-    from datautils import *
 
     parser = argparse.ArgumentParser()
 
