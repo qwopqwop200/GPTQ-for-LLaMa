@@ -1,14 +1,15 @@
+import argparse
 import time
-
+import numpy as np
 import torch
 import torch.nn as nn
+import quant
 
-from gptq import *
-from modelutils import *
-import quant 
+from gptq import GPTQ, Observer
+from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders, export_quant_table, gen_conditions
+from texttable import Texttable
 
 def get_llama(model):
-    import torch
     def skip(*args, **kwargs):
         pass
     torch.nn.init.kaiming_uniform_ = skip
@@ -67,6 +68,7 @@ def llama_sequential(model, dataloader, dev):
     print('Ready.')
 
     quantizers = {}
+    observer = Observer()
     for i in range(len(layers)):
         layer = layers[i].to(dev)
         full = find_layers(layer)
@@ -79,17 +81,16 @@ def llama_sequential(model, dataloader, dev):
             ]
         else:
             sequential = [list(full.keys())]
-       
+
         for names in sequential:
             subset = {n: full[n] for n in names}
             gptq = {}
             for name in subset:
-                gptq[name] = GPTQ(subset[name])
-                gptq[name].quantizer = quant.Quantizer()
+                gptq[name] = GPTQ(subset[name], observe=args.observe)
                 gptq[name].quantizer.configure(
                     args.wbits, perchannel=True, sym=args.sym, mse=False
                 )
-                
+            
             def add_batch(name):
                 def tmp(_, inp, out):
                     gptq[name].add_batch(inp[0].data, out.data)
@@ -104,19 +105,58 @@ def llama_sequential(model, dataloader, dev):
 
             for name in subset:
                 print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
-                scale,zero,g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
-                quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu())
-                gptq[name].free()
-                
+
+                scale,zero,g_idx,error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+                quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), args.wbits, args.groupsize)
+
+                if args.observe:
+                    observer.submit(name=name, layerid=i, gptq=gptq[name], error=error)
+                else:
+                    gptq[name].free()
+
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids = position_ids)[0]
 
         layers[i] = layer.cpu()
         del layer
-        del gptq 
+        del gptq
         torch.cuda.empty_cache()
 
         inps, outs = outs, inps
+
+    if args.observe:
+        observer.print()
+        conditions = gen_conditions(args.wbits, args.groupsize)
+        for item in observer.items():
+            name = item[0]
+            layerid = item[1]
+            gptq = item[2]['gptq']
+            error = item[2]['error']
+            target = error / 2
+            
+            table = Texttable()
+            table.header(['wbits', 'groupsize', 'error'])
+            table.set_cols_dtype(['i', 'i', 'f'])
+            table.add_row([args.wbits, args.groupsize, error])
+
+            print('Optimizing {} {} ..'.format(name, layerid))
+            for wbits, groupsize in conditions:
+
+                if error < target:
+                    # if error dropped 50%, skip
+                    break
+
+                gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
+
+                scale,zero,g_idx,error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order)
+
+                table.add_row([wbits, groupsize, error])
+                quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
+                
+            print(table.draw())
+            print('\n')
+            gptq.layer.to('cpu')
+            gptq.free()
 
     model.config.use_cache = use_cache
     
@@ -226,7 +266,7 @@ def llama_pack(model, quantizers, wbits, groupsize):
     print('Packing ...')
     for name in qlayers:
         print(name)
-        quantizers[name],scale,zero,g_idx = quantizers[name]
+        quantizers[name],scale,zero,g_idx,_,_ = quantizers[name]
         qlayers[name].pack(layers[name], scale, zero, g_idx)
     print('Done.')
     return model
@@ -351,7 +391,6 @@ def benchmark(model, input_ids, check=False):
             cache['past'] = list(out.past_key_values)
             del out
         sync()
-        import numpy as np
         print('Median:', np.median(times))
         if check:
             print('PPL:', torch.exp(tot / (input_ids.numel() - 1)).item())
@@ -359,8 +398,6 @@ def benchmark(model, input_ids, check=False):
 
 
 if __name__ == '__main__':
-    import argparse
-    from datautils import *
 
     parser = argparse.ArgumentParser()
 
@@ -440,6 +477,15 @@ if __name__ == '__main__':
         '--new-eval', action='store_true',
         help='Whether to use the new PTB and C4 eval'
     )
+    parser.add_argument(
+        '--observe', action='store_true',
+        help='Auto upgrade layer precision to higher precision, for example int2 to int4, groupsize 128 to 64. \
+            When this feature enabled, `--save` or `--save_safetensors` would be disable.'
+    )
+    parser.add_argument(
+        '--quant-directory', type=str, default=None,
+        help='Specify the directory for export quantization parameters to toml format. `None` means no export by default.'
+    )
     
     args = parser.parse_args()
 
@@ -481,12 +527,15 @@ if __name__ == '__main__':
             )
             print(dataset)
             llama_eval(model, testloader, DEV)
+    
+    if args.quant_directory is not None:
+        export_quant_table(quantizers, args.quant_directory)
 
-    if args.save:
+    if not args.observe and args.save:
         llama_pack(model, quantizers, args.wbits, args.groupsize)
         torch.save(model.state_dict(), args.save) 
 
-    if args.save_safetensors:
+    if not args.observe and args.save_safetensors:
         llama_pack(model, quantizers, args.wbits, args.groupsize)
         from safetensors.torch import save_file as safe_save
         state_dict = model.state_dict()

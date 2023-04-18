@@ -4,3 +4,6 @@ sentencepiece
 git+https://github.com/huggingface/transformers
 accelerate==0.17.1
 triton==2.0.0
+texttable
+toml
+numpy

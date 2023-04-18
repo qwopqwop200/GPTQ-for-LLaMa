@@ -4,17 +4,57 @@ import time
 import torch
 import torch.nn as nn
 import transformers
-
 import quant
-
-DEBUG = False 
+from texttable import Texttable
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
+class Observer:
+    def __init__(self, topk=5):
+        self.loss_list = []
+        self.topk = topk
+    
+    def submit(self, name:str, layerid: int, gptq, error: float):
+
+        item = (name, layerid, {
+            'gptq': gptq,
+            'error': error
+        })
+
+        if len(self.loss_list) < self.topk:
+            self.loss_list.append(item)
+            return
+
+        min_error = error
+        min_idx = -1
+        for idx, data in enumerate(self.loss_list):
+            if min_error > data[2]['error']:
+                min_idx = idx
+                min_error = data[2]['error']
+
+        if min_idx >= 0:
+            self.loss_list[min_idx] = item
+
+    def print(self):
+        self.loss_list = sorted(self.loss_list, key=lambda s: s[2]['error'], reverse=True)
+        
+        table = Texttable()
+
+        table.header(['name', 'error'])
+        table.set_cols_dtype(['t', 'f'])
+
+        for item in self.loss_list:
+            table.add_row([f"{item[0]}.{item[1]}", item[2]['error']])
+        print(table.draw())
+        print('\n')
+
+    def items(self):
+        return self.loss_list
+
 
 class GPTQ:
-    def __init__(self, layer):
+    def __init__(self, layer, observe=False):
         self.layer = layer
         self.dev = self.layer.weight.device
         W = layer.weight.data.clone()
@@ -26,9 +66,12 @@ class GPTQ:
         self.columns = W.shape[1]
         self.H = torch.zeros((self.columns, self.columns), device=self.dev)
         self.nsamples = 0
+        self.quantizer = quant.Quantizer()
+        self.observe = observe
 
     def add_batch(self, inp, out):
-        if DEBUG:
+        # Hessian H = 2 X XT + λ I
+        if self.observe:
             self.inp1 = inp
             self.out1 = out
         if len(inp.shape) == 2:
@@ -58,6 +101,8 @@ class GPTQ:
     def fasterquant(
         self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False
     ):
+        self.layer.to(self.dev)
+
         W = self.layer.weight.data.clone()
         if isinstance(self.layer, nn.Conv2d):
             W = W.flatten(1)
@@ -71,7 +116,8 @@ class GPTQ:
             self.quantizer.find_params(W, weight=True)
 
         H = self.H
-        del self.H
+        if not self.observe:
+            del self.H
         dead = torch.diag(H) == 0
         H[dead, dead] = 1
         W[:, dead] = 0
@@ -135,15 +181,10 @@ class GPTQ:
 
             W[:, i2:] -= Err1.matmul(Hinv[i1:i2, i2:])
 
-            if DEBUG:
-                self.layer.weight.data[:, :i2] = Q[:, :i2]
-                self.layer.weight.data[:, i2:] = W[:, i2:]
-                print(torch.sum((self.layer(self.inp1) - self.out1) ** 2))
-                print(torch.sum(Losses))
 
         torch.cuda.synchronize()
-        print('time %.2f' % (time.time() - tick))
-        print('error', torch.sum(Losses).item())
+        error = torch.sum(Losses).item()
+        print('time %.2f, error %.2f' % (time.time() - tick, error))
         
         groupsize = groupsize if groupsize != -1 else self.columns
         g_idx = [i // groupsize  for i in range(self.columns)]
@@ -156,18 +197,19 @@ class GPTQ:
         if isinstance(self.layer, transformers.Conv1D):
             Q = Q.t()
         self.layer.weight.data = Q.reshape(self.layer.weight.shape).to(self.layer.weight.data.dtype)
-        if DEBUG:
-            print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
+
+        # if self.observe:
+        #     print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
             
         if scale == []:
             scale.append(self.quantizer.scale)
             zero.append(self.quantizer.zero)
         scale = torch.cat(scale,dim=1)
         zero = torch.cat(zero,dim=1)
-        return scale,zero,g_idx
-            
+        return scale,zero,g_idx,error
+
     def free(self):
-        if DEBUG:
+        if self.observe:
             self.inp1 = None
             self.out1 = None
         self.H = None
