@@ -7,11 +7,11 @@ import transformers
 import quant
 from texttable import Texttable
 
-torch.backends.cuda.matmul.allow_tf32 = False
-torch.backends.cudnn.allow_tf32 = False
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
 class Observer:
-    def __init__(self, topk=5):
+    def __init__(self, topk=40):
         self.loss_list = []
         self.topk = topk
     
@@ -67,6 +67,8 @@ class GPTQ:
         self.H = torch.zeros((self.columns, self.columns), device=self.dev)
         self.nsamples = 0
         self.quantizer = quant.Quantizer()
+        self.inp_quantizer = quant.Quantizer()
+        self.inp_quantizer.configure(8, perchannel=False, sym=True, mse=False, norm=2.4, grid=100, maxshrink=.8,trits=False)
         self.observe = observe
 
     def add_batch(self, inp, out):
@@ -74,6 +76,7 @@ class GPTQ:
         if self.observe:
             self.inp1 = inp
             self.out1 = out
+
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
         tmp = inp.shape[0]
