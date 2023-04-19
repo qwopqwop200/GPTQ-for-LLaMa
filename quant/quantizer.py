@@ -44,6 +44,7 @@ class Quantizer(nn.Module):
     
     def update_minmax(self, x):
         dev = x.device
+        self.maxq = self.maxq.to(dev)
 
         xmin = torch.min(x)
         xmax = torch.max(x)
@@ -60,6 +61,7 @@ class Quantizer(nn.Module):
         self.scale = (self.max - self.min) / 2 / self.maxq
         self.zero = torch.zeros_like(self.scale)
 
+        shape = x.shape
         if len(shape) == 4:
             self.scale = self.scale.reshape((1, -1, 1, 1))
             self.zero = self.zero.reshape((1, -1, 1, 1))

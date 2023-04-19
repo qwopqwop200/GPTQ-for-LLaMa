@@ -6,6 +6,7 @@ import torch.nn as nn
 import transformers
 import quant
 from texttable import Texttable
+from utils import torch_snr_error
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
@@ -76,6 +77,7 @@ class GPTQ:
         if self.observe:
             self.inp1 = inp
             self.out1 = out
+            self.inp_quantizer.update_minmax(inp)
 
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
@@ -186,8 +188,7 @@ class GPTQ:
 
 
         torch.cuda.synchronize()
-        error = torch.sum(Losses).item()
-        print('time %.2f, error %.2f' % (time.time() - tick, error))
+        weight_error = torch.sum(Losses).item()
         
         groupsize = groupsize if groupsize != -1 else self.columns
         g_idx = [i // groupsize  for i in range(self.columns)]
@@ -203,13 +204,19 @@ class GPTQ:
 
         # if self.observe:
         #     print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
-            
+        qinp = quant.quantize(self.inp1, self.inp_quantizer.scale, self.inp_quantizer.zero, self.inp_quantizer.maxq)
+        qout = self.layer(qinp)
+        forward_error = torch_snr_error(qout, self.out1)
+
+        print('time %.2f, weight_error %.2f, forward_SNR %0.4f' % (time.time() - tick, weight_error, forward_error.item()))
+
+
         if scale == []:
             scale.append(self.quantizer.scale)
             zero.append(self.quantizer.zero)
         scale = torch.cat(scale,dim=1)
         zero = torch.cat(zero,dim=1)
-        return scale,zero,g_idx,error
+        return scale,zero,g_idx,forward_error.item()
 
     def free(self):
         if self.observe:

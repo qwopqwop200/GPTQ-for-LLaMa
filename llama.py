@@ -127,36 +127,36 @@ def llama_sequential(model, dataloader, dev):
     if args.observe:
         observer.print()
         conditions = gen_conditions(args.wbits, args.groupsize)
-        for item in observer.items():
-            name = item[0]
-            layerid = item[1]
-            gptq = item[2]['gptq']
-            error = item[2]['error']
-            target = error / 2
+        # for item in observer.items():
+        #     name = item[0]
+        #     layerid = item[1]
+        #     gptq = item[2]['gptq']
+        #     error = item[2]['error']
+        #     target = error / 2
             
-            table = Texttable()
-            table.header(['wbits', 'groupsize', 'error'])
-            table.set_cols_dtype(['i', 'i', 'f'])
-            table.add_row([args.wbits, args.groupsize, error])
+        #     table = Texttable()
+        #     table.header(['wbits', 'groupsize', 'error'])
+        #     table.set_cols_dtype(['i', 'i', 'f'])
+        #     table.add_row([args.wbits, args.groupsize, error])
 
-            print('Optimizing {} {} ..'.format(name, layerid))
-            for wbits, groupsize in conditions:
+        #     print('Optimizing {} {} ..'.format(name, layerid))
+        #     for wbits, groupsize in conditions:
 
-                if error < target:
-                    # if error dropped 50%, skip
-                    break
+        #         if error < target:
+        #             # if error dropped 50%, skip
+        #             break
 
-                gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
+        #         gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
 
-                scale,zero,g_idx,error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order)
+        #         scale,zero,g_idx,error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order)
 
-                table.add_row([wbits, groupsize, error])
-                quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
+        #         table.add_row([wbits, groupsize, error])
+        #         quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
                 
-            print(table.draw())
-            print('\n')
-            gptq.layer.to('cpu')
-            gptq.free()
+        #     print(table.draw())
+        #     print('\n')
+        #     gptq.layer.to('cpu')
+        #     gptq.free()
 
     model.config.use_cache = use_cache
     
