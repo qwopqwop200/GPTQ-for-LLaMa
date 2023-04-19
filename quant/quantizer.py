@@ -3,12 +3,6 @@ import torch
 import torch.nn as nn
 import math
 
-def quantize(x, scale, zero, maxq):
-    if maxq < 0:
-        return (x > scale / 2).float() * scale + (x < zero / 2).float() * zero
-    q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
-    return scale * (q - zero)
-
 class Quantizer(nn.Module):
 
     def __init__(self, shape=1):
@@ -34,6 +28,12 @@ class Quantizer(nn.Module):
         if trits:
             self.maxq = torch.tensor(-1)
         self.scale = torch.zeros_like(self.scale)
+
+    def _quantize(self, scale, zero, maxq):
+        if maxq < 0:
+            return (x > scale / 2).float() * scale + (x < zero / 2).float() * zero
+        q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
+        return scale * (q - zero)
 
     def find_params(self, x, weight=False):
         dev = x.device
@@ -85,7 +85,7 @@ class Quantizer(nn.Module):
                 xmax1 = p * xmax
                 scale1 = (xmax1 - xmin1) / self.maxq
                 zero1 = torch.round(-xmin1 / scale1) if not self.sym else self.zero
-                q = quantize(x, scale1.unsqueeze(1), zero1.unsqueeze(1), self.maxq)
+                q = self._quantize(x, scale1.unsqueeze(1), zero1.unsqueeze(1), self.maxq)
                 q -= x
                 q.abs_()
                 q.pow_(self.norm)
@@ -120,7 +120,8 @@ class Quantizer(nn.Module):
 
     def quantize(self, x):
         if self.ready():
-            return quantize(x, self.scale, self.zero, self.maxq)
+            return self._quantize(x, self.scale, self.zero, self.maxq)
+        
         return x
 
     def enabled(self):
