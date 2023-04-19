@@ -272,7 +272,7 @@ def llama_pack(model, quantizers, wbits, groupsize):
     return model
 
 def load_quant(model, checkpoint, wbits, groupsize = -1, fused_mlp = True, eval=True, warmup_autotune = True):
-    from transformers import LlamaConfig, LlamaForCausalLM 
+    from transformers import LlamaConfig, LlamaForCausalLM, modeling_utils
     config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
         pass
@@ -281,7 +281,7 @@ def load_quant(model, checkpoint, wbits, groupsize = -1, fused_mlp = True, eval=
     torch.nn.init.normal_ = noop 
 
     torch.set_default_dtype(torch.half)
-    transformers.modeling_utils._init_weights = False
+    modeling_utils._init_weights = False
     torch.set_default_dtype(torch.half)
     model = LlamaForCausalLM(config)
     torch.set_default_dtype(torch.float)
