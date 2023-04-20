@@ -75,6 +75,9 @@ class GPTQ:
         if self.observe:
             self.inp1 = inp
             self.out1 = out
+        else:
+            self.inp1 = None
+            self.out1 = None
 
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
@@ -103,25 +106,28 @@ class GPTQ:
 
     def print_loss(self, name, q_weight, weight_error, timecost):
         table = Texttable()
+        name += ' ' * (16 - len(name))
 
         table.header(['name', 'weight_error', 'fp_inp_SNR', 'q_inp_SNR', 'time'])
-        table.set_cols_dtype(['t', 'f', 'f', 'f', 'f'])
 
         # assign weight
         self.layer.weight.data = q_weight.reshape(self.layer.weight.shape).to(self.layer.weight.data.dtype)
 
-        # quantize input to int8
-        quantizer = quant.Quantizer()
-        quantizer.configure(8, perchannel=False, sym=True, mse=False)
-        quantizer.find_params(self.inp1)
-        q_in = quantizer.quantize(self.inp1).type(torch.float16)
-        q_out = self.layer(q_in)
+        if self.inp1 is not None:
+            # quantize input to int8
+            quantizer = quant.Quantizer()
+            quantizer.configure(8, perchannel=False, sym=True, mse=False)
+            quantizer.find_params(self.inp1)
+            q_in = quantizer.quantize(self.inp1).type(torch.float16)
+            q_out = self.layer(q_in)
 
-        # get kinds of SNR
-        q_SNR = torch_snr_error(q_out, self.out1).item()
-        fp_SNR = torch_snr_error(self.layer(self.inp1), self.out1).item()
+            # get kinds of SNR
+            q_SNR = torch_snr_error(q_out, self.out1).item()
+            fp_SNR = torch_snr_error(self.layer(self.inp1), self.out1).item()
+        else:
+            q_SNR = '-'
+            fp_SNR = '-'
 
-        name += ' ' * (16 - len(name))
         table.add_row([name, weight_error, fp_SNR, q_SNR, timecost])
         print(table.draw().split('\n')[-2])
 
@@ -231,9 +237,8 @@ class GPTQ:
         return scale,zero,g_idx,error
 
     def free(self):
-        if self.observe:
-            self.inp1 = None
-            self.out1 = None
+        self.inp1 = None
+        self.out1 = None
         self.H = None
         self.Losses = None
         self.Trace = None
