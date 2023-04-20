@@ -6,12 +6,13 @@ import torch.nn as nn
 import transformers
 import quant
 from texttable import Texttable
+from utils import torch_snr_error
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
 class Observer:
-    def __init__(self, topk=5):
+    def __init__(self, topk=32):
         self.loss_list = []
         self.topk = topk
     
@@ -74,6 +75,10 @@ class GPTQ:
         if self.observe:
             self.inp1 = inp
             self.out1 = out
+        else:
+            self.inp1 = None
+            self.out1 = None
+
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
         tmp = inp.shape[0]
@@ -98,8 +103,37 @@ class GPTQ:
         # self.H += 2 / self.nsamples * inp.matmul(inp.t())
         self.H += inp.matmul(inp.t())
 
+
+    def print_loss(self, name, q_weight, weight_error, timecost):
+        table = Texttable()
+        name += ' ' * (16 - len(name))
+
+        table.header(['name', 'weight_error', 'fp_inp_SNR', 'q_inp_SNR', 'time'])
+
+        # assign weight
+        self.layer.weight.data = q_weight.reshape(self.layer.weight.shape).to(self.layer.weight.data.dtype)
+
+        if self.inp1 is not None:
+            # quantize input to int8
+            quantizer = quant.Quantizer()
+            quantizer.configure(8, perchannel=False, sym=True, mse=False)
+            quantizer.find_params(self.inp1)
+            q_in = quantizer.quantize(self.inp1).type(torch.float16)
+            q_out = self.layer(q_in)
+
+            # get kinds of SNR
+            q_SNR = torch_snr_error(q_out, self.out1).item()
+            fp_SNR = torch_snr_error(self.layer(self.inp1), self.out1).item()
+        else:
+            q_SNR = '-'
+            fp_SNR = '-'
+
+        table.add_row([name, weight_error, fp_SNR, q_SNR, timecost])
+        print(table.draw().split('\n')[-2])
+
+
     def fasterquant(
-        self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False
+        self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False, name=''
     ):
         self.layer.to(self.dev)
 
@@ -166,9 +200,7 @@ class GPTQ:
                         zero.append(self.quantizer.zero)
                         now_idx += 1
 
-                q = quant.quantize(
-                    w.unsqueeze(1), self.quantizer.scale, self.quantizer.zero, self.quantizer.maxq
-                ).flatten()
+                q = self.quantizer.quantize(w.unsqueeze(1)).flatten()
                 Q1[:, i] = q
                 Losses1[:, i] = (w - q) ** 2 / d ** 2
 
@@ -181,10 +213,8 @@ class GPTQ:
 
             W[:, i2:] -= Err1.matmul(Hinv[i1:i2, i2:])
 
-
         torch.cuda.synchronize()
         error = torch.sum(Losses).item()
-        print('time %.2f, error %.2f' % (time.time() - tick, error))
         
         groupsize = groupsize if groupsize != -1 else self.columns
         g_idx = [i // groupsize  for i in range(self.columns)]
@@ -196,11 +226,9 @@ class GPTQ:
 
         if isinstance(self.layer, transformers.Conv1D):
             Q = Q.t()
-        self.layer.weight.data = Q.reshape(self.layer.weight.shape).to(self.layer.weight.data.dtype)
 
-        # if self.observe:
-        #     print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
-            
+        self.print_loss(name=name, q_weight=Q, weight_error=error, timecost=(time.time()-tick))
+
         if scale == []:
             scale.append(self.quantizer.scale)
             zero.append(self.quantizer.zero)
@@ -209,9 +237,8 @@ class GPTQ:
         return scale,zero,g_idx,error
 
     def free(self):
-        if self.observe:
-            self.inp1 = None
-            self.out1 = None
+        self.inp1 = None
+        self.out1 = None
         self.H = None
         self.Losses = None
         self.Trace = None

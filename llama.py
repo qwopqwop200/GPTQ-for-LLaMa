@@ -70,6 +70,12 @@ def llama_sequential(model, dataloader, dev):
     quantizers = {}
     observer = Observer()
     for i in range(len(layers)):
+
+        print(f'Quantizing layer {i+1}/{len(layers)}..')
+        print('+------------------+--------------+------------+-----------+-------+')
+        print('|       name       | weight_error | fp_inp_SNR | q_inp_SNR | time  |')
+        print('+==================+==============+============+===========+=======+')
+
         layer = layers[i].to(dev)
         full = find_layers(layer)
         if args.true_sequential:
@@ -104,9 +110,7 @@ def llama_sequential(model, dataloader, dev):
                 h.remove()
 
             for name in subset:
-                print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
-
-                scale,zero,g_idx,error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+                scale,zero,g_idx,error = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order, name=name)
                 quantizers['model.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), args.wbits, args.groupsize)
 
                 if args.observe:
@@ -123,6 +127,8 @@ def llama_sequential(model, dataloader, dev):
         torch.cuda.empty_cache()
 
         inps, outs = outs, inps
+        print('+------------------+--------------+------------+-----------+-------+')
+        print('\n')
 
     if args.observe:
         observer.print()
@@ -148,7 +154,7 @@ def llama_sequential(model, dataloader, dev):
 
                 gptq.quantizer.configure(wbits, perchannel=True, sym=args.sym, mse=False)
 
-                scale,zero,g_idx,error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order)
+                scale,zero,g_idx,error = gptq.fasterquant(percdamp=args.percdamp, groupsize=groupsize, actorder=args.act_order, name=name)
 
                 table.add_row([wbits, groupsize, error])
                 quantizers['model.layers.%d.%s' % (layerid, name)] = (gptq.quantizer.cpu(),scale.cpu(),zero.cpu(),g_idx.cpu(), wbits, groupsize)
@@ -222,9 +228,7 @@ def llama_eval(model, testenc, dev):
                 )
                 W = subset[name].weight.data
                 quantizer.find_params(W, weight=True)
-                subset[name].weight.data = quantize(
-                    W, quantizer.scale, quantizer.zero, quantizer.maxq
-                ).to(next(iter(layer.parameters())).dtype)
+                subset[name].weight.data = quantizer.quantize(W).to(next(iter(layer.parameters())).dtype)
 
         for j in range(nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids = position_ids)[0]
