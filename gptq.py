@@ -188,7 +188,7 @@ class GPTQ:
 
 
         torch.cuda.synchronize()
-        weight_error = torch.sum(Losses).item()
+        error = torch.sum(Losses).item()
         
         groupsize = groupsize if groupsize != -1 else self.columns
         g_idx = [i // groupsize  for i in range(self.columns)]
@@ -204,19 +204,20 @@ class GPTQ:
 
         # if self.observe:
         #     print(torch.sum((self.layer(self.inp1) - self.out1).type(torch.float32) ** 2))
-        qinp = quant.quantize(self.inp1, self.inp_quantizer.scale, self.inp_quantizer.zero, self.inp_quantizer.maxq)
+        self.inp_quantizer.find_params(self.inp1)
+        qinp = quant.quantize(self.inp1, self.inp_quantizer.scale, self.inp_quantizer.zero, self.inp_quantizer.maxq).type(torch.float16)
         qout = self.layer(qinp)
-        forward_error = torch_snr_error(qout, self.out1)
+        SNR = torch_snr_error(qout, self.out1)
 
-        print('time %.2f, weight_error %.2f, forward_SNR %0.4f' % (time.time() - tick, weight_error, forward_error.item()))
-
+        print('time %.2f, error %.2f, SNR %0.4f' % (time.time() - tick, error, SNR.item()))
+        print('\n')
 
         if scale == []:
             scale.append(self.quantizer.scale)
             zero.append(self.quantizer.zero)
         scale = torch.cat(scale,dim=1)
         zero = torch.cat(zero,dim=1)
-        return scale,zero,g_idx,forward_error.item()
+        return scale,zero,g_idx,error
 
     def free(self):
         if self.observe:
