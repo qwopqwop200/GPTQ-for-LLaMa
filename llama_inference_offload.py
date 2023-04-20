@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 
@@ -6,8 +5,9 @@ from gptq import GPTQ
 import argparse
 from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders
 import quant 
-from transformers import AutoTokenizer
 
+import transformers
+from transformers import AutoTokenizer
 from transformers.models.llama.modeling_llama import LlamaModel,LlamaConfig
 from transformers.modeling_outputs import BaseModelOutputWithPast
 from typing import List, Optional, Tuple, Union
