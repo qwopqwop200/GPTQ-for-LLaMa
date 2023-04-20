@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-
 DEV = torch.device('cuda:0')
 
 
@@ -10,9 +9,7 @@ def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
         return {name: module}
     res = {}
     for name1, child in module.named_children():
-        res.update(find_layers(
-            child, layers=layers, name=name + '.' + name1 if name != '' else name1
-        ))
+        res.update(find_layers(child, layers=layers, name=name + '.' + name1 if name != '' else name1))
     return res
 
 
@@ -24,18 +21,19 @@ def gen_conditions(_wbits, _groupsize):
         if wbits >= 8:
             if groupsize == -1 or groupsize == 32:
                 break
-        
+
         if groupsize > 32:
             groupsize /= 2
         else:
             wbits *= 2
             groupsize = _groupsize
-        
+
         conditions.append((int(wbits), int(groupsize)))
     return conditions
 
+
 # copy from https://github.com/openppl-public/ppq/blob/master/ppq/quantization/measure/norm.py
-def torch_snr_error(y_pred: torch.Tensor, y_real: torch.Tensor, reduction: str='mean') -> torch.Tensor:
+def torch_snr_error(y_pred: torch.Tensor, y_real: torch.Tensor, reduction: str = 'mean') -> torch.Tensor:
     """
     Compute SNR between y_pred(tensor) and y_real(tensor)
     
@@ -61,7 +59,7 @@ def torch_snr_error(y_pred: torch.Tensor, y_real: torch.Tensor, reduction: str='
 
     if y_pred.shape != y_real.shape:
         raise ValueError(f'Can not compute snr loss for tensors with different shape. '
-            f'({y_pred.shape} and {y_real.shape})')
+                         f'({y_pred.shape} and {y_real.shape})')
     reduction = str(reduction).lower()
 
     if y_pred.ndim == 1:
@@ -71,7 +69,7 @@ def torch_snr_error(y_pred: torch.Tensor, y_real: torch.Tensor, reduction: str='
     y_pred = y_pred.flatten(start_dim=1)
     y_real = y_real.flatten(start_dim=1)
 
-    noise_power  = torch.pow(y_pred - y_real, 2).sum(dim=-1)
+    noise_power = torch.pow(y_pred - y_real, 2).sum(dim=-1)
     signal_power = torch.pow(y_real, 2).sum(dim=-1)
     snr = (noise_power) / (signal_power + 1e-7)
 

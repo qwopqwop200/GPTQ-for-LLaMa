@@ -6,17 +6,26 @@ from torch.cuda.amp import custom_bwd, custom_fwd
 from transformers.models.llama.modeling_llama import LlamaAttention, apply_rotary_pos_emb
 from .quant_linear import *
 
+
 class QuantLlamaAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self,hidden_size,num_heads,qkv_proj,o_proj,rotary_emb,):
+    def __init__(
+        self,
+        hidden_size,
+        num_heads,
+        qkv_proj,
+        o_proj,
+        rotary_emb,
+    ):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_heads
         self.head_dim = hidden_size // num_heads
 
         if (self.head_dim * num_heads) != self.hidden_size:
-            raise ValueError(f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"f" and `num_heads`: {num_heads}).")
+            raise ValueError(f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
+                             f" and `num_heads`: {num_heads}).")
         self.qkv_proj = qkv_proj
         self.o_proj = o_proj
         self.rotary_emb = rotary_emb
@@ -24,7 +33,7 @@ class QuantLlamaAttention(nn.Module):
     def _shape(self, tensor, seq_len, bsz):
         return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
 
-    def forward(self,hidden_states,past_key_value = None,attention_mask = None,position_ids = None, output_attentions = False,use_cache= False):
+    def forward(self, hidden_states, past_key_value=None, attention_mask=None, position_ids=None, output_attentions=False, use_cache=False):
         """Input shape: Batch x Time x Channel"""
 
         bsz, q_len, _ = hidden_states.size()
@@ -52,7 +61,7 @@ class QuantLlamaAttention(nn.Module):
         past_key_value = (key_states, value_states) if use_cache else None
 
         with torch.backends.cuda.sdp_kernel(enable_math=False):
-            attn_output = F.scaled_dot_product_attention(query_states,key_states,value_states,is_causal=is_causal)
+            attn_output = F.scaled_dot_product_attention(query_states, key_states, value_states, is_causal=is_causal)
 
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
@@ -63,7 +72,8 @@ class QuantLlamaAttention(nn.Module):
             attn_weights = None
 
         return attn_output, attn_weights, past_key_value
-        
+
+
 def make_quant_attn(model):
     """
     Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
