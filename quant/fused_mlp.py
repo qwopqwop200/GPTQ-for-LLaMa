@@ -168,7 +168,8 @@ class QuantLlamaMLP(nn.Module):
                                      x.stride(0), x.stride(1),
                                      self.gate_proj_qweight.stride(0), self.gate_proj_qweight.stride(1),
                                      c.stride(0), c.stride(1),
-                                     self.gate_proj_scales.stride(0), self.gate_proj_qzeros.stride(0))   
+                                     self.gate_proj_scales.stride(0), self.gate_proj_qzeros.stride(0))
+	c = c.reshape(out_shape)
         return c
         
     def fused2cuda(self):
