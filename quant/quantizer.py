@@ -29,7 +29,7 @@ class Quantizer(nn.Module):
             self.maxq = torch.tensor(-1)
         self.scale = torch.zeros_like(self.scale)
 
-    def _quantize(self, scale, zero, maxq):
+    def _quantize(self, x, scale, zero, maxq):
         if maxq < 0:
             return (x > scale / 2).float() * scale + (x < zero / 2).float() * zero
         q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
