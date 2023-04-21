@@ -610,7 +610,7 @@ if __name__ == '__main__':
         type=int, default=0, help='Seed for sampling the calibration data.'
     )
     parser.add_argument(
-        '--nsamples', type=int, default=128,
+        '--nsamples', type=int, default=512,
         help='Number of calibration data samples.'
     )
     parser.add_argument(
