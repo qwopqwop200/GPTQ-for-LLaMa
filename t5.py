@@ -54,7 +54,7 @@ def t5_sequential(model, dataloader, dev):
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
         try:
-            model(batch[0].to(dev)[:,:model.seqlen])
+            model(batch[0].to(dev))
         except ValueError:
             pass
     layers[0] = layers[0].module
@@ -126,7 +126,7 @@ def t5_sequential(model, dataloader, dev):
     
     cache = {'i': 0, 'attention_mask': None, 'encoder_attention_mask': None}
     
-    inps = torch.zeros((args.nsamples, model.seqlen, model.encoder.config.d_model), dtype=dtype, device=dev)
+    inps = torch.zeros((args.nsamples, model.seqlen, model.decoder.config.d_model), dtype=dtype, device=dev)
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -141,7 +141,7 @@ def t5_sequential(model, dataloader, dev):
     layers[0] = Catcher(layers[0])
     for j,batch in enumerate(dataloader):
         try:
-            model(decoder_input_ids = batch[0].to(dev)[:,model.seqlen:],encoder_outputs = [encoder_hidden_states[j:j+1],])
+            model(decoder_input_ids = batch[0].to(dev),encoder_outputs = [encoder_hidden_states[j:j+1],])
         except ValueError:
             pass
     layers[0] = layers[0].module
@@ -620,7 +620,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--nearest', action='store_true',
         help='Whether to run the RTN baseline.'
-    ) 
+    )
     parser.add_argument(
         '--wbits', type=int, default=16, choices=[2, 3, 4, 8, 16],
         help='#bits to use for quantization; use 16 for evaluating base model.'
@@ -691,7 +691,7 @@ if __name__ == '__main__':
         
     if not args.nearest and not args.load:
         dataloader, testloader = get_loaders(
-            args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen * 2
+            args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
         )
 
     if not args.load and args.wbits < 16 and not args.nearest:
