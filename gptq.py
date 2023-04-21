@@ -11,17 +11,16 @@ from utils import torch_snr_error
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
+
 class Observer:
+
     def __init__(self, topk=32):
         self.loss_list = []
         self.topk = topk
-    
-    def submit(self, name:str, layerid: int, gptq, error: float):
 
-        item = (name, layerid, {
-            'gptq': gptq,
-            'error': error
-        })
+    def submit(self, name: str, layerid: int, gptq, error: float):
+
+        item = (name, layerid, {'gptq': gptq, 'error': error})
 
         if len(self.loss_list) < self.topk:
             self.loss_list.append(item)
@@ -39,7 +38,7 @@ class Observer:
 
     def print(self):
         self.loss_list = sorted(self.loss_list, key=lambda s: s[2]['error'], reverse=True)
-        
+
         table = Texttable()
 
         table.header(['name', 'error'])
@@ -55,6 +54,7 @@ class Observer:
 
 
 class GPTQ:
+
     def __init__(self, layer, observe=False):
         self.layer = layer
         self.dev = self.layer.weight.device
@@ -87,12 +87,7 @@ class GPTQ:
                 inp = inp.reshape((-1, inp.shape[-1]))
             inp = inp.t()
         if isinstance(self.layer, nn.Conv2d):
-            unfold = nn.Unfold(
-                self.layer.kernel_size,
-                dilation=self.layer.dilation,
-                padding=self.layer.padding,
-                stride=self.layer.stride
-            )
+            unfold = nn.Unfold(self.layer.kernel_size, dilation=self.layer.dilation, padding=self.layer.padding, stride=self.layer.stride)
             inp = unfold(inp)
             inp = inp.permute([1, 0, 2])
             inp = inp.flatten(1)
@@ -102,7 +97,6 @@ class GPTQ:
         inp = math.sqrt(2 / self.nsamples) * inp.float()
         # self.H += 2 / self.nsamples * inp.matmul(inp.t())
         self.H += inp.matmul(inp.t())
-
 
     def print_loss(self, name, q_weight, weight_error, timecost):
         table = Texttable()
@@ -131,10 +125,7 @@ class GPTQ:
         table.add_row([name, weight_error, fp_SNR, q_SNR, timecost])
         print(table.draw().split('\n')[-2])
 
-
-    def fasterquant(
-        self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False, name=''
-    ):
+    def fasterquant(self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False, name=''):
         self.layer.to(self.dev)
 
         W = self.layer.weight.data.clone()
@@ -155,7 +146,7 @@ class GPTQ:
         dead = torch.diag(H) == 0
         H[dead, dead] = 1
         W[:, dead] = 0
-        
+
         if actorder:
             perm = torch.argsort(torch.diag(H), descending=True)
             W = W[:, perm]
@@ -171,7 +162,7 @@ class GPTQ:
         H = torch.cholesky_inverse(H)
         H = torch.linalg.cholesky(H, upper=True)
         Hinv = H
-        
+
         g_idx = []
         scale = []
         zero = []
@@ -202,7 +193,7 @@ class GPTQ:
 
                 q = self.quantizer.quantize(w.unsqueeze(1)).flatten()
                 Q1[:, i] = q
-                Losses1[:, i] = (w - q) ** 2 / d ** 2
+                Losses1[:, i] = (w - q)**2 / d**2
 
                 err1 = (w - q) / d
                 W1[:, i:] -= err1.unsqueeze(1).matmul(Hinv1[i, i:].unsqueeze(0))
@@ -215,9 +206,9 @@ class GPTQ:
 
         torch.cuda.synchronize()
         error = torch.sum(Losses).item()
-        
+
         groupsize = groupsize if groupsize != -1 else self.columns
-        g_idx = [i // groupsize  for i in range(self.columns)]
+        g_idx = [i // groupsize for i in range(self.columns)]
         g_idx = torch.tensor(g_idx, dtype=torch.int32, device=Q.device)
         if actorder:
             invperm = torch.argsort(perm)
@@ -227,14 +218,14 @@ class GPTQ:
         if isinstance(self.layer, transformers.Conv1D):
             Q = Q.t()
 
-        self.print_loss(name=name, q_weight=Q, weight_error=error, timecost=(time.time()-tick))
+        self.print_loss(name=name, q_weight=Q, weight_error=error, timecost=(time.time() - tick))
 
         if scale == []:
             scale.append(self.quantizer.scale)
             zero.append(self.quantizer.zero)
-        scale = torch.cat(scale,dim=1)
-        zero = torch.cat(zero,dim=1)
-        return scale,zero,g_idx,error
+        scale = torch.cat(scale, dim=1)
+        zero = torch.cat(zero, dim=1)
+        return scale, zero, g_idx, error
 
     def free(self):
         self.inp1 = None

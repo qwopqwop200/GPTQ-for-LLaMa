@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import math
 
+
 class Quantizer(nn.Module):
 
     def __init__(self, shape=1):
@@ -11,20 +12,15 @@ class Quantizer(nn.Module):
         self.register_buffer('scale', torch.zeros(shape))
         self.register_buffer('zero', torch.zeros(shape))
 
-    def configure(
-        self,
-        bits, perchannel=False, sym=True, 
-        mse=False, norm=2.4, grid=100, maxshrink=.8,
-        trits=False
-        ):
-        
-        self.maxq = torch.tensor(2 ** bits - 1)
+    def configure(self, bits, perchannel=False, sym=True, mse=False, norm=2.4, grid=100, maxshrink=.8, trits=False):
+
+        self.maxq = torch.tensor(2**bits - 1)
         self.perchannel = perchannel
         self.sym = sym
         self.mse = mse
         self.norm = norm
         self.grid = grid
-        self.maxshrink = maxshrink 
+        self.maxshrink = maxshrink
         if trits:
             self.maxq = torch.tensor(-1)
         self.scale = torch.zeros_like(self.scale)
@@ -80,7 +76,7 @@ class Quantizer(nn.Module):
         if self.mse:
             best = torch.full([x.shape[0]], float('inf'), device=dev)
             for i in range(int(self.maxshrink * self.grid)):
-                p = 1 - i / self.grid 
+                p = 1 - i / self.grid
                 xmin1 = p * xmin
                 xmax1 = p * xmax
                 scale1 = (xmax1 - xmin1) / self.maxq
@@ -113,7 +109,7 @@ class Quantizer(nn.Module):
             self.zero = self.zero.reshape((1, -1, 1, 1))
         if len(shape) == 3:
             self.scale = self.scale.reshape((1, 1, -1))
-            self.zero = self.zero.reshape((1, 1, -1)) 
+            self.zero = self.zero.reshape((1, 1, -1))
         if len(shape) == 2:
             self.scale = self.scale.unsqueeze(0)
             self.zero = self.zero.unsqueeze(0)
@@ -121,7 +117,7 @@ class Quantizer(nn.Module):
     def quantize(self, x):
         if self.ready():
             return self._quantize(x, self.scale, self.zero, self.maxq)
-        
+
         return x
 
     def enabled(self):
