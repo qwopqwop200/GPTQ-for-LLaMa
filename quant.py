@@ -270,7 +270,7 @@ class QuantLinear(nn.Module):
         out_shape = x.shape[:-1] + (self.outfeatures, )
         x = x.reshape(-1,x.shape[-1])     
         if  self.is_cuda is True and (self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold):
-            out = torch.zeros((x.shape[0], self.outfeatures), device='cuda', dtype=torch.float32)
+            out = torch.zeros((x.shape[0], self.outfeatures), device=x.device, dtype=torch.float32)
             if self.bits == 2:
                 quant_cuda.vecquant2matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
             elif self.bits == 3:
