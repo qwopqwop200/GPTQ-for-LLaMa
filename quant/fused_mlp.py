@@ -155,22 +155,23 @@ class QuantLlamaMLP(nn.Module):
         return self.down_proj(self.triton_llama_mlp(x))
 
     def triton_llama_mlp(self, x):
-        out_shape = x.shape[:-1] + (self.intermediate_size, )
-        x = x.reshape(-1,x.shape[-1])
-        M, K = x.shape
-        N = self.intermediate_size 
-        c = torch.empty((M, N), device='cuda', dtype=torch.float16)
-        grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']),)
-        fusedmatmul_248_kernel[grid](x, c,
-                                     self.gate_proj_qweight, self.gate_proj_scales, self.gate_proj_qzeros, self.gate_proj_g_idx,
-                                     self.up_proj_qweight  , self.up_proj_scales  , self.up_proj_qzeros  , self.up_proj_g_idx,
-                                     M, N, K, self.bits, self.maxq,
-                                     x.stride(0), x.stride(1),
-                                     self.gate_proj_qweight.stride(0), self.gate_proj_qweight.stride(1),
-                                     c.stride(0), c.stride(1),
-                                     self.gate_proj_scales.stride(0), self.gate_proj_qzeros.stride(0))
-        c = c.reshape(out_shape)
-        return c
+        with torch.cuda.device(x.device):
+            out_shape = x.shape[:-1] + (self.intermediate_size, )
+            x = x.reshape(-1,x.shape[-1])
+            M, K = x.shape
+            N = self.intermediate_size 
+            c = torch.empty((M, N), device='cuda', dtype=torch.float16)
+            grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']),)
+            fusedmatmul_248_kernel[grid](x, c,
+                                         self.gate_proj_qweight, self.gate_proj_scales, self.gate_proj_qzeros, self.gate_proj_g_idx,
+                                         self.up_proj_qweight  , self.up_proj_scales  , self.up_proj_qzeros  , self.up_proj_g_idx,
+                                         M, N, K, self.bits, self.maxq,
+                                         x.stride(0), x.stride(1),
+                                         self.gate_proj_qweight.stride(0), self.gate_proj_qweight.stride(1),
+                                         c.stride(0), c.stride(1),
+                                         self.gate_proj_scales.stride(0), self.gate_proj_qzeros.stride(0))
+            c = c.reshape(out_shape)
+            return c
         
     def fused2cuda(self):
         self.gate_proj_qweight = self.gate_proj_qweight.cuda()
