@@ -10,7 +10,7 @@ GPTQ is SOTA one-shot weight quantization method
 
 **Triton only supports Linux, so if you are a Windows user, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).**
 
-## New Features
+## News or Update
 **I release [AutoGPTQ-triton](https://github.com/qwopqwop200/AutoGPTQ-triton), a packaged version of GPTQ based on [PanQiWei's AutoGPTQ](https://github.com/PanQiWei/AutoGPTQ). Use [AutoGPTQ](https://github.com/PanQiWei/AutoGPTQ) if you want a cuda version.**
 
 ## Result
