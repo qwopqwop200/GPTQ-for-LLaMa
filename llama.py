@@ -350,7 +350,8 @@ def llama_multigpu(model, gpus):
             return tmp
 
     layers = model.model.layers
-    pergpu = math.ceil(len(layers) / len(gpus))
+    from math import ceil
+    pergpu = ceil(len(layers) / len(gpus))
     for i in range(len(layers)):
         layers[i] = MoveModule(layers[i].to(gpus[i // pergpu]))
 
