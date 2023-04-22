@@ -13,7 +13,10 @@ def get_wikitext2(nsamples, seed, seqlen, model):
     testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
 
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    except:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=True)
     trainenc = tokenizer("\n\n".join(traindata['text']), return_tensors='pt')
     testenc = tokenizer("\n\n".join(testdata['text']), return_tensors='pt')
 
@@ -36,7 +39,10 @@ def get_ptb(nsamples, seed, seqlen, model):
     valdata = load_dataset('ptb_text_only', 'penn_treebank', split='validation')
 
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    except:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=True)
     trainenc = tokenizer("\n\n".join(traindata['sentence']), return_tensors='pt')
     testenc = tokenizer("\n\n".join(valdata['sentence']), return_tensors='pt')
 
@@ -59,7 +65,10 @@ def get_c4(nsamples, seed, seqlen, model):
     valdata = load_dataset('allenai/c4', 'allenai--c4', data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'}, split='validation', use_auth_token=False)
 
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    except:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=True)
 
     import random
     random.seed(seed)
@@ -107,7 +116,10 @@ def get_ptb_new(nsamples, seed, seqlen, model):
     testdata = load_dataset('ptb_text_only', 'penn_treebank', split='test')
 
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    except:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=True)
     trainenc = tokenizer(" ".join(traindata['sentence']), return_tensors='pt')
     testenc = tokenizer(" ".join(testdata['sentence']), return_tensors='pt')
 
@@ -130,7 +142,10 @@ def get_c4_new(nsamples, seed, seqlen, model):
     valdata = load_dataset('allenai/c4', 'allenai--c4', data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'}, split='validation')
 
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
+    except:
+        tokenizer = AutoTokenizer.from_pretrained(model, use_fast=True)
 
     import random
     random.seed(seed)
