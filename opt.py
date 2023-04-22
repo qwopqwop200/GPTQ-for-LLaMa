@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import argparse
 
+import transformers
 from gptq import GPTQ
 from utils import find_layers, DEV, set_seed, get_wikitext2, get_ptb, get_c4, get_ptb_new, get_c4_new, get_loaders
 import quant
@@ -108,7 +109,7 @@ def opt_sequential(model, dataloader, dev):
 
         for name in subset:
             print(f'Quantizing {name} in layer {i+1}/{len(layers)}...')
-            scale, zero, g_idx = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
+            scale, zero, g_idx, _ = gptq[name].fasterquant(percdamp=args.percdamp, groupsize=args.groupsize, actorder=args.act_order)
             quantizers['model.decoder.layers.%d.%s' % (i, name)] = (gptq[name].quantizer.cpu(), scale.cpu(), zero.cpu(), g_idx.cpu())
             gptq[name].free()
 
