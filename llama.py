@@ -305,9 +305,9 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
         from safetensors.torch import load_file as safe_load
-        model.load_state_dict(safe_load(checkpoint), strict=False)
+        model.load_state_dict(safe_load(checkpoint))
     else:
-        model.load_state_dict(torch.load(checkpoint), strict=False)
+        model.load_state_dict(torch.load(checkpoint))
 
     quant.make_quant_attn(model)
     if eval and fused_mlp:
