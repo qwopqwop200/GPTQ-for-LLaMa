@@ -323,7 +323,7 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
     return model
 
 
-def llama_multigpu(model, gpus):
+def llama_multigpu(model, gpus, gpu_dist):
     model.model.embed_tokens = model.model.embed_tokens.to(gpus[0])
     if hasattr(model.model, 'norm') and model.model.norm:
         model.model.norm = model.model.norm.to(gpus[-1])
@@ -351,9 +351,21 @@ def llama_multigpu(model, gpus):
 
     layers = model.model.layers
     from math import ceil
-    pergpu = ceil(len(layers) / len(gpus))
-    for i in range(len(layers)):
-        layers[i] = MoveModule(layers[i].to(gpus[i // pergpu]))
+    if not gpu_dist:
+        pergpu = ceil(len(layers) / len(gpus))
+        for i in range(len(layers)):
+            layers[i] = MoveModule(layers[i].to(gpus[i // pergpu]))
+    else:
+        assigned_gpus = []
+        for i in range(len(gpu_dist)):
+            assigned_gpus = assigned_gpus + [i] * gpu_dist[i]
+
+        remaining_assignments = len(layers)-len(assigned_gpus)
+        if remaining_assignments > 0:
+            assigned_gpus = assigned_gpus + [-1] * remaining_assignments
+
+        for i in range(len(layers)):
+            layers[i] = MoveModule(layers[i].to(gpus[assigned_gpus[i]]))
 
     model.gpus = gpus
 
@@ -398,7 +410,11 @@ def benchmark(model, input_ids, check=False):
             sync()
             times.append(time.time() - tick)
             print(i, times[-1])
-            max_memory = max(max_memory, torch.cuda.memory_allocated() / 1024 / 1024)
+            if hasattr(model, 'gpus'):
+                mem_allocated = sum(torch.cuda.memory_allocated(gpu) for gpu in model.gpus) / 1024 / 1024
+            else:
+                mem_allocated = torch.cuda.memory_allocated() / 1024 / 1024
+            max_memory = max(max_memory, mem_allocated)
             if check and i != input_ids.numel() - 1:
                 tot += loss(out.logits[0].to(DEV), input_ids[:, (i + 1)].to(DEV)).float()
             cache['past'] = list(out.past_key_values)
@@ -433,6 +449,7 @@ if __name__ == '__main__':
     parser.add_argument('--act-order', action='store_true', help='Whether to apply the activation order GPTQ heuristic')
     parser.add_argument('--true-sequential', action='store_true', help='Whether to run in true sequential model.')
     parser.add_argument('--new-eval', action='store_true', help='Whether to use the new PTB and C4 eval')
+    parser.add_argument('--layers-dist', type=str, default='', help='Distribution of layers across GPUs. e.g. 2:1:1 for 2 layers on GPU 0, 1 layer on GPU 1, and 1 layer on GPU 2. Any remaining layers will be assigned to your last GPU.')
     parser.add_argument('--observe',
                         action='store_true',
                         help='Auto upgrade layer precision to higher precision, for example int2 to int4, groupsize 128 to 64. \
@@ -440,6 +457,11 @@ if __name__ == '__main__':
     parser.add_argument('--quant-directory', type=str, default=None, help='Specify the directory for export quantization parameters to toml format. `None` means no export by default.')
 
     args = parser.parse_args()
+
+    if args.layers_dist:
+        gpu_dist = [int(x) for x in args.layers_dist.split(':')]
+    else:
+        gpu_dist = []
 
     if type(args.load) is not str:
         args.load = args.load.as_posix()
@@ -460,7 +482,7 @@ if __name__ == '__main__':
     if args.benchmark:
         gpus = [torch.device('cuda:%d' % i) for i in range(torch.cuda.device_count())]
         if len(gpus) > 1:
-            llama_multigpu(model, gpus)
+            llama_multigpu(model, gpus, gpu_dist)
         else:
             model = model.to(DEV)
         if args.benchmark:
