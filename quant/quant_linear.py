@@ -234,7 +234,6 @@ try:
         scales_ptrs = scales_ptr + offs_n[None, :] + g_idx[:, None] * stride_scales
         zeros_ptrs = zeros_ptr + (offs_n[None, :] // infearure_per_bits) + g_idx[:, None] * stride_zeros
 
-
         if NO_GROUP:
             scales = tl.load(scales_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
             zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
