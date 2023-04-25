@@ -8,6 +8,7 @@ try:
     import triton
     import triton.language as tl
     from . import custom_autotune
+
     # code based https://github.com/fpgaminer/GPTQ-triton
     @custom_autotune.autotune(
         configs=[
@@ -70,7 +71,7 @@ try:
     )
     @triton.jit
     def matmul_248_kernel(a_ptr, b_ptr, c_ptr, scales_ptr, zeros_ptr, g_ptr, M, N, K, bits, maxq, stride_am, stride_ak, stride_bk, stride_bn, stride_cm, stride_cn, stride_scales, stride_zeros,
-                          NO_GROUP: tl.constexpr, BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr):
+                          BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr):
         """
         Compute the matrix multiplication C = A x B.
         A is of shape (M, K) float16
@@ -105,27 +106,19 @@ try:
         scales_ptrs = scales_ptr + offs_bn[None, :]
         zeros_ptrs = zeros_ptr + (offs_bn[None, :] // infearure_per_bits)
 
-        if NO_GROUP:
-            scales = tl.load(scales_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-            zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-
-            zeros = (zeros >> zeros_shifter[None, :]) & maxq
-            zeros = (zeros + 1)
-        
         shifter = (offs_k % infearure_per_bits) * bits
         zeros_shifter = (offs_bn % infearure_per_bits) * bits
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
 
         for k in range(0, num_pid_k):
-            # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
-            if not NO_GROUP: 
-                g_idx = tl.load(g_ptrs)
-            
-                scales = tl.load(scales_ptrs + g_idx[:, None] * stride_scales)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-                zeros = tl.load(zeros_ptrs + g_idx[:, None] * stride_zeros)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            g_idx = tl.load(g_ptrs)
 
-                zeros = (zeros >> zeros_shifter[None, :]) & maxq
-                zeros = (zeros + 1)
+            # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
+            scales = tl.load(scales_ptrs + g_idx[:, None] * stride_scales)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            zeros = tl.load(zeros_ptrs + g_idx[:, None] * stride_zeros)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+
+            zeros = (zeros >> zeros_shifter[None, :]) & maxq
+            zeros = (zeros + 1)
 
             a = tl.load(a_ptrs, mask=a_mask, other=0.)  # (BLOCK_SIZE_M, BLOCK_SIZE_K)
             b = tl.load(b_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N), but repeated
@@ -197,7 +190,7 @@ try:
                               nearest_power_of_two=True)
     @triton.jit
     def transpose_matmul_248_kernel(a_ptr, b_ptr, c_ptr, scales_ptr, zeros_ptr, g_ptr, M, N, K, bits, maxq, stride_am, stride_ak, stride_bk, stride_bn, stride_cm, stride_cn, stride_scales,
-                                    stride_zeros, NO_GROUP: tl.constexpr, BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr):
+                                    stride_zeros, BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr):
         """
         Compute the matrix multiplication C = A x B.
         A is of shape (M, N) float16
@@ -234,25 +227,17 @@ try:
         scales_ptrs = scales_ptr + offs_n[None, :] + g_idx[:, None] * stride_scales
         zeros_ptrs = zeros_ptr + (offs_n[None, :] // infearure_per_bits) + g_idx[:, None] * stride_zeros
 
-        if NO_GROUP:
-            scales = tl.load(scales_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-            zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-
-            zeros = (zeros >> zeros_shifter[None, :]) & maxq
-            zeros = (zeros + 1)
-        
         shifter = (offs_bk % infearure_per_bits) * bits
         zeros_shifter = (offs_n % infearure_per_bits) * bits
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_K), dtype=tl.float32)
 
         for k in range(0, num_pid_n):
             # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
-            if not NO_GROUP:
-                scales = tl.load(scales_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
-                zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            scales = tl.load(scales_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
+            zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
 
-                zeros = (zeros >> zeros_shifter[None, :]) & maxq
-                zeros = (zeros + 1)
+            zeros = (zeros >> zeros_shifter[None, :]) & maxq
+            zeros = (zeros + 1)
 
             a = tl.load(a_ptrs, mask=a_mask, other=0.)  # (BLOCK_SIZE_M, BLOCK_SIZE_N)
             b = tl.load(b_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N), but repeated
@@ -275,22 +260,22 @@ except:
     print('trioton not installed.')
 
 
-def matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq, no_group):
+def matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq):
     with torch.cuda.device(input.device):
         output = torch.empty((input.shape[0], qweight.shape[1]), device='cuda', dtype=torch.float16)
         grid = lambda META: (triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(qweight.shape[1], META['BLOCK_SIZE_N']), )
         matmul_248_kernel[grid](input, qweight, output, scales, qzeros, g_idx, input.shape[0], qweight.shape[1], input.shape[1], bits, maxq, input.stride(0), input.stride(1), qweight.stride(0),
-                                qweight.stride(1), output.stride(0), output.stride(1), scales.stride(0), qzeros.stride(0), no_group)
+                                qweight.stride(1), output.stride(0), output.stride(1), scales.stride(0), qzeros.stride(0))
         return output
 
 
-def transpose_matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq, no_group):
+def transpose_matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq):
     with torch.cuda.device(input.device):
         output_dim = (qweight.shape[0] * 32) // bits
         output = torch.empty((input.shape[0], output_dim), device='cuda', dtype=torch.float16)
         grid = lambda META: (triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(output_dim, META['BLOCK_SIZE_K']), )
         transpose_matmul_248_kernel[grid](input, qweight, output, scales, qzeros, g_idx, input.shape[0], qweight.shape[1], output_dim, bits, maxq, input.stride(0), input.stride(1), qweight.stride(0),
-                                          qweight.stride(1), output.stride(0), output.stride(1), scales.stride(0), qzeros.stride(0), no_group)
+                                          qweight.stride(1), output.stride(0), output.stride(1), scales.stride(0), qzeros.stride(0))
         return output
 
 
@@ -298,21 +283,21 @@ class QuantLinearFunction(torch.autograd.Function):
 
     @staticmethod
     @custom_fwd(cast_inputs=torch.float16)
-    def forward(ctx, input, qweight, scales, qzeros, g_idx, bits, maxq, no_group):
-        output = matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq, no_group)
+    def forward(ctx, input, qweight, scales, qzeros, g_idx, bits, maxq):
+        output = matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq)
         ctx.save_for_backward(qweight, scales, qzeros, g_idx)
-        ctx.bits, ctx.maxq, ctx.no_group = bits, maxq, no_group
+        ctx.bits, ctx.maxq = bits, maxq
         return output
 
     @staticmethod
     @custom_bwd
     def backward(ctx, grad_output):
         qweight, scales, qzeros, g_idx = ctx.saved_tensors
-        bits, maxq, no_group = ctx.bits, ctx.maxq, ctx.no_group
+        bits, maxq = ctx.bits, ctx.maxq
         grad_input = None
 
         if ctx.needs_input_grad[0]:
-            grad_input = transpose_matmul248(grad_output, qweight, scales, qzeros, g_idx, bits, maxq, no_group)
+            grad_input = transpose_matmul248(grad_output, qweight, scales, qzeros, g_idx, bits, maxq)
         return grad_input, None, None, None, None, None, None
 
 
@@ -327,8 +312,7 @@ class QuantLinear(nn.Module):
         self.bits = bits
         self.maxq = 2**self.bits - 1
         self.groupsize = groupsize if groupsize != -1 else infeatures
-        self.no_group = math.ceil(infeatures / self.groupsize) == 1
-        
+
         self.register_buffer('qweight', torch.zeros((infeatures // 32 * self.bits, outfeatures), dtype=torch.int32))
         self.register_buffer('qzeros', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures // 32 * self.bits), dtype=torch.int32))
         self.register_buffer('scales', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures), dtype=torch.float16))
@@ -388,7 +372,7 @@ class QuantLinear(nn.Module):
 
     def forward(self, x):
         out_shape = x.shape[:-1] + (self.outfeatures, )
-        out = QuantLinearFunction.apply(x.reshape(-1, x.shape[-1]), self.qweight, self.scales, self.qzeros, self.g_idx, self.bits, self.maxq, self.no_group)
+        out = QuantLinearFunction.apply(x.reshape(-1, x.shape[-1]), self.qweight, self.scales, self.qzeros, self.g_idx, self.bits, self.maxq)
         out = out + self.bias if self.bias is not None else out
         return out.reshape(out_shape)
 
@@ -422,7 +406,7 @@ def autotune_warmup_linear(model, transpose=False):
         n = m.outfeatures
 
         if (k, n) not in kn_values:
-            kn_values[(k, n)] = (m.qweight.cuda(), m.scales.cuda(), m.qzeros.cuda(), m.g_idx.cuda(), m.bits, m.maxq, m.no_group)
+            kn_values[(k, n)] = (m.qweight.cuda(), m.scales.cuda(), m.qzeros.cuda(), m.g_idx.cuda(), m.bits, m.maxq)
 
     print(f'Found {len(kn_values)} unique KN Linear values.')
 
@@ -430,10 +414,10 @@ def autotune_warmup_linear(model, transpose=False):
     with torch.no_grad():
         for m in tqdm(range(0, 12)):
             m = 2**m  # [1, 2048]
-            for (k, n), (qweight, scales, qzeros, g_idx, bits, maxq, no_group) in kn_values.items():
+            for (k, n), (qweight, scales, qzeros, g_idx, bits, maxq) in kn_values.items():
                 a = torch.randn(m, k, dtype=torch.float16, device='cuda')
-                matmul248(a, qweight, scales, qzeros, g_idx, bits, maxq, no_group)
+                matmul248(a, qweight, scales, qzeros, g_idx, bits, maxq)
                 if transpose:
                     a = torch.randn(m, n, dtype=torch.float16, device='cuda')
-                    transpose_matmul248(a, qweight, scales, qzeros, g_idx, bits, maxq, no_group)
+                    transpose_matmul248(a, qweight, scales, qzeros, g_idx, bits, maxq)
     del kn_values
