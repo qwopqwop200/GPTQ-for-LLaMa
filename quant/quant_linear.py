@@ -117,10 +117,10 @@ try:
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
 
         for k in range(0, num_pid_k):
-            g_idx = tl.load(g_ptrs)
-
             # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
             if not NO_GROUP: 
+                g_idx = tl.load(g_ptrs)
+            
                 scales = tl.load(scales_ptrs + g_idx[:, None] * stride_scales)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
                 zeros = tl.load(zeros_ptrs + g_idx[:, None] * stride_zeros)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
 
