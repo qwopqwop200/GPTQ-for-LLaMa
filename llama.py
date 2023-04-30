@@ -251,7 +251,6 @@ def load_quant(model, checkpoint, wbits, groupsize=-1):
         if name in layers:
             del layers[name]
     make_quant(model, layers, wbits, groupsize)
-    make_quant_attn(model)
 
     del layers
     
@@ -261,6 +260,8 @@ def load_quant(model, checkpoint, wbits, groupsize=-1):
         model.load_state_dict(safe_load(checkpoint), strict = False)
     else:
         model.load_state_dict(torch.load(checkpoint), strict = False)
+        
+    make_quant_attn(model)
     model.seqlen = 2048
     print('Done.')
 
