@@ -161,7 +161,6 @@ class QuantLinear(nn.Module):
         self.register_buffer('qweight', torch.zeros((infeatures // 32 * self.bits, outfeatures), dtype=torch.int32))
         self.register_buffer('qzeros', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures // 32 * self.bits), dtype=torch.int32))
         self.register_buffer('scales', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures), dtype=torch.float16))
-        self.register_buffer('g_idx', torch.tensor([i // self.groupsize  for i in range(infeatures)], dtype = torch.int32))
         if bias:
             self.register_buffer('bias', torch.zeros((outfeatures),dtype=torch.float16))
         else:
@@ -180,9 +179,7 @@ class QuantLinear(nn.Module):
         self.kernel_switch_threshold = kernel_switch_threshold
         self.is_cuda = is_cuda
 
-    def pack(self, linear, scales, zeros, g_idx = None):
-        self.g_idx = g_idx.clone() if g_idx is not None else self.g_idx
-        
+    def pack(self, linear, scales, zeros):
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
         scale_zeros = zeros * scales
@@ -192,7 +189,8 @@ class QuantLinear(nn.Module):
             
         intweight = []
         for idx in range(self.infeatures):
-            intweight.append(torch.round((linear.weight.data[:,idx] + scale_zeros[self.g_idx[idx]]) / self.scales[self.g_idx[idx]]).to(torch.int)[:,None])
+            g_idx = idx // self.groupsize
+            intweight.append(torch.round((linear.weight.data[:,idx] + scale_zeros[g_idx]) / self.scales[g_idx]).to(torch.int)[:,None])
         intweight = torch.cat(intweight,dim=1)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
@@ -302,10 +300,14 @@ class QuantLinear(nn.Module):
                 torch.bitwise_and(zeros, (2 ** self.bits) - 1, out=zeros)
                     
                 zeros = zeros + 1
-                zeros = zeros.reshape(self.scales.shape)   
-                            
+                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
+   
+                scales = self.scales
+                scales = scales.reshape(-1, 1, scales.shape[-1])
+                
                 weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 32 // self.bits, -1), self.wf.unsqueeze(-1)).to(torch.int16 if self.bits == 8 else torch.int8)
                 torch.bitwise_and(weight,(2 ** self.bits) - 1, out=weight)
+                weight = weight.reshape(-1, self.groupsize, weight.shape[2])
              elif self.bits == 3:
                 zeros = self.qzeros.reshape(self.qzeros.shape[0], self.qzeros.shape[1]//3, 3, 1).expand(-1, -1, -1, 12)
                 zeros = (zeros >> self.wf.unsqueeze(0))
@@ -315,7 +317,10 @@ class QuantLinear(nn.Module):
                 zeros = torch.cat([zeros[:,:,0,:11], zeros[:,:,1,1:12], zeros[:,:,2,1:11]], dim=2)
                 
                 zeros = zeros + 1
-                zeros = zeros.reshape(self.scales.shape)  
+                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2]) 
+                
+                scales = self.scales
+                scales = scales.reshape(-1, 1, scales.shape[-1])
                 
                 weight = self.qweight.reshape(self.qweight.shape[0]//3, 3, 1, self.qweight.shape[1]).expand(-1, -1, 12, -1)
                 weight = (weight >> self.wf.unsqueeze(-1))&0x7
@@ -323,11 +328,11 @@ class QuantLinear(nn.Module):
                 weight[:,1,11] = (weight[:,1,11]&0x1) | ((weight[:,2,0] << 1)&0x6)
                 weight = weight & 0x7
                 weight = torch.cat([weight[:,0,:11], weight[:,1,1:12], weight[:,2,1:11]], dim=1)
-                    
+                weight = weight.reshape(-1, self.groupsize, weight.shape[2])
+             weight = (scales * (weight - zeros))
              weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
                     
-             weights = (self.scales[self.g_idx] * (weight - zeros[self.g_idx]))
-             out = torch.matmul(x.half(), weights)
+             out = torch.matmul(x.half(), weight)
         out = out.reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out
