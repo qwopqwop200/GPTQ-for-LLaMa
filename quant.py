@@ -148,7 +148,7 @@ def make_quant(module, names, bits, groupsize, name=''):
         make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
 
 class QuantLinear(nn.Module): 
-    def __init__(self, bits, groupsize, infeatures, outfeatures, bias, kernel_switch_threshold=128, is_cuda=is_cuda):
+    def __init__(self, bits, groupsize, infeatures, outfeatures, bias, faster=True, kernel_switch_threshold=128, is_cuda=is_cuda):
         super().__init__()
         if bits not in [2,3,4,8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
@@ -166,6 +166,8 @@ class QuantLinear(nn.Module):
             self.register_buffer('bias', torch.zeros((outfeatures),dtype=torch.float16))
         else:
             self.bias = None
+        self.half_indim = self.infeatures // 2
+        self.faster = faster if bits != 8 else False
         
         # is performed by unpacking the weights and using torch.matmul
         if self.bits in [2,4,8]: 
@@ -270,16 +272,30 @@ class QuantLinear(nn.Module):
         out_shape = x.shape[:-1] + (self.outfeatures, )
         x = x.reshape(-1,x.shape[-1])     
         if  self.is_cuda is True and (self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold):
-            out = torch.zeros((x.shape[0], self.outfeatures), device=x.device, dtype=torch.float32)
-            if self.bits == 2:
-                quant_cuda.vecquant2matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
-            elif self.bits == 3:
-                quant_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
-            elif self.bits == 4:
-                quant_cuda.vecquant4matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
-            elif self.bits == 8:
-                quant_cuda.vecquant8matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
-            out = out.half()
+            out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.float, device=x.device)
+            
+            if self.faster:
+                x = x.half()
+                if self.bits == 2:
+                    quant_cuda.vecquant2matmul_faster(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize, self.half_indim)
+                elif self.bits == 3:
+                    quant_cuda.vecquant3matmul_faster(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize, self.half_indim)
+                elif self.bits == 4:
+                    quant_cuda.vecquant4matmul_faster(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize, self.half_indim)
+                else:
+                    raise NotImplementedError("Only 2,3,4 bits are supported.")
+            else:
+                x = x.float()
+                if self.bits == 2:
+                    quant_cuda.vecquant2matmul(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize)
+                elif self.bits == 3:
+                    quant_cuda.vecquant3matmul(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize)
+                elif self.bits == 4:
+                    quant_cuda.vecquant4matmul(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize)
+                elif self.bits == 8:
+                    quant_cuda.vecquant8matmul(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize)
+                else:
+                    raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         else:
              if self.bits in [2,4,8]:
                 zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits), self.wf.unsqueeze(0)).to(torch.int16 if self.bits == 8 else torch.int8)
