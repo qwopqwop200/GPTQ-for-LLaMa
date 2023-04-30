@@ -68,9 +68,9 @@ class QuantLlamaAttention(nn.Module):
 
         past_key_value = (key_states, value_states) if use_cache else None
 
-        with torch.backends.cuda.sdp_kernel(enable_math=False):
+        with torch.backends.cuda.sdp_kernel():
             attn_output = F.scaled_dot_product_attention(query_states, key_states, value_states, is_causal=is_causal)
-
+        attn_output = attn_output
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
 
