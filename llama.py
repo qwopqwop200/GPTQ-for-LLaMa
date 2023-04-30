@@ -6,7 +6,7 @@ import torch.nn as nn
 from gptq import *
 from modelutils import *
 from quant import *
-
+from fused_attn import *
 
 def get_llama(model):
     import torch
@@ -197,7 +197,6 @@ def llama_eval(model, testenc, dev):
     if model.model.norm is not None:
         model.model.norm = model.model.norm.to(dev)
     model.lm_head = model.lm_head.to(dev)
-
     testenc = testenc.to(dev)
     nlls = []
     for i in range(nsamples):
@@ -252,6 +251,7 @@ def load_quant(model, checkpoint, wbits, groupsize=-1):
         if name in layers:
             del layers[name]
     make_quant(model, layers, wbits, groupsize)
+    make_quant_attn(model)
 
     del layers
     
