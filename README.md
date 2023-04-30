@@ -1,6 +1,5 @@
 # GPTQ-for-LLaMA
 4 bits quantization of [LLaMA](https://arxiv.org/abs/2302.13971) using [GPTQ](https://arxiv.org/abs/2210.17323)
-
 GPTQ is SOTA one-shot weight quantization method
 
 **This code is based on [GPTQ](https://github.com/IST-DASLab/gptq)**
@@ -10,7 +9,7 @@ Changed to support new features proposed by [GPTQ](https://github.com/IST-DASLab
 * Slightly adjusted preprocessing of C4 and PTB for more realistic evaluations (used in our updated results); can be activated via the flag --new-eval.
 * two new tricks:--act-order (quantizing columns in order of decreasing activation size) and --true-sequential (performing sequential quantization even within a single Transformer block). Those fix GPTQ's strangely bad performance on the 7B model (from 7.15 to 6.09 Wiki2 PPL) and lead to slight improvements on most models/settings in general. 
 
-**Unless you are using 3bit, i recommend using a [branch](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/triton) that currently supports [triton](https://github.com/openai/triton).**
+**It doesn't support act-order, but works faster than triton.**
 
 ## Result
 <details>
