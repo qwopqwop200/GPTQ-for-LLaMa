@@ -58,6 +58,14 @@ class QuantLlamaAttention(nn.Module):
             key_states = torch.cat([past_key_value[0], key_states], dim=2)
             value_states = torch.cat([past_key_value[1], value_states], dim=2)
 
+        if use_cache:
+            # Since qkv_proj is fused, query_states etc will hold a reference to the original qkv_states tensor
+            # which can cause excessive memory usage by the cache. `contiguous` is a convenient way to workaround this.
+            query_states = query_states.contiguous()
+            key_states = key_states.contiguous()
+            value_states = value_states.contiguous()
+
+
         past_key_value = (key_states, value_states) if use_cache else None
 
         with torch.backends.cuda.sdp_kernel(enable_math=False):
