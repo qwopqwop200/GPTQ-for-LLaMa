@@ -115,9 +115,9 @@ python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weig
 # Benchmark language generation with 4-bit LLaMA-7B:
 
 # Save compressed model
-CUDA_VISIBLE_DEVICES=0 python llama.py ./llama-hf/llama-7b c4 --wbits 4 --true-sequential --act-order --groupsize 128 --save llama7b-4bit-128g.pt
+CUDA_VISIBLE_DEVICES=0 python llama.py ./llama-hf/llama-7b c4 --wbits 4 --true-sequential --groupsize 128 --save llama7b-4bit-128g.pt
 # Or save compressed `.safetensors` model
-CUDA_VISIBLE_DEVICES=0 python llama.py ./llama-hf/llama-7b c4 --wbits 4 --true-sequential --act-order --groupsize 128 --save_safetensors llama7b-4bit-128g.safetensors
+CUDA_VISIBLE_DEVICES=0 python llama.py ./llama-hf/llama-7b c4 --wbits 4 --true-sequential --groupsize 128 --save_safetensors llama7b-4bit-128g.safetensors
 
 # Benchmark generating a 2048 token sequence with the saved model
 CUDA_VISIBLE_DEVICES=0 python llama.py ./llama-hf/llama-7b c4 --wbits 4 --groupsize 128 --load llama7b-4bit-128g.pt --benchmark 2048 --check
