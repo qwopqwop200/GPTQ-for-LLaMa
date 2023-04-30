@@ -231,7 +231,7 @@ try:
         zeros_shifter = (offs_n % infearure_per_bits) * bits
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_K), dtype=tl.float32)
 
-        for k in range(0, num_pid_n):
+        for n in range(0, num_pid_n):
             # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
             scales = tl.load(scales_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
             zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
