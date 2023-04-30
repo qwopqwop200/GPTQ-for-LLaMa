@@ -5,7 +5,7 @@
 
 GPTQ is SOTA one-shot weight quantization method
 
-**Due to Triton's limitations, 3-bit is not supported. If you are using 3bit, please use [cuda branch](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).**
+**It can be used universally, but it is not the [fastest](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/old-cuda) and only supports linux.**
 
 **Triton only supports Linux, so if you are a Windows user, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).**
 
