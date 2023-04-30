@@ -97,14 +97,12 @@ def make_quant_attn(model):
         qweights = torch.cat([q_proj.qweight, k_proj.qweight, v_proj.qweight], dim=1)
         qzeros = torch.cat([q_proj.qzeros, k_proj.qzeros, v_proj.qzeros], dim=1)
         scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
-        g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
         bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
 
         qkv_layer = QuantLinear(q_proj.bits, q_proj.groupsize, q_proj.infeatures, q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures, True if q_proj.bias is not None else False)
         qkv_layer.qweight = qweights
         qkv_layer.qzeros = qzeros
         qkv_layer.scales = scales
-        qkv_layer.g_idx = g_idx
         qkv_layer.bias = bias
 
         attn = QuantLlamaAttention(m.hidden_size, m.num_heads, qkv_layer, m.o_proj, m.rotary_emb)
