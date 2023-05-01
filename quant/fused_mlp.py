@@ -209,7 +209,7 @@ class QuantLlamaMLP(nn.Module):
             x = x.reshape(-1, x.shape[-1])
             M, K = x.shape
             N = self.intermediate_size
-            c = torch.empty((M, N), device='cuda', dtype=torch.float16)
+            c = torch.empty((M, N), device=x.device, dtype=torch.float16)
             grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']), )
             fusedmatmul_248_kernel[grid](x, c, self.gate_proj_qweight, self.gate_proj_scales, self.gate_proj_qzeros, self.gate_proj_g_idx, self.up_proj_qweight, self.up_proj_scales,
                                          self.up_proj_qzeros, self.up_proj_g_idx, M, N, K, self.bits, self.maxq, x.stride(0), x.stride(1), self.gate_proj_qweight.stride(0),
