@@ -179,7 +179,7 @@ class QuantLinear(nn.Module):
         self.kernel_switch_threshold = kernel_switch_threshold
         self.is_cuda = is_cuda
 
-    def pack(self, linear, scales, zeros):
+    def pack(self, linear, scales, zeros, g_idx):
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
         scale_zeros = zeros * scales
