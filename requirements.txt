@@ -7,5 +7,5 @@ triton==2.0.0
 texttable
 toml
 numpy
-protobuf==3.20.0
+protobuf==3.20.2
 
