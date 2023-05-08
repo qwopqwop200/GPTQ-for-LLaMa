@@ -213,9 +213,12 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer, fused_mlp=True, w
     load_checkpoint_in_model(model, checkpoint, dtype='float16')
     model.seqlen = 2048
 
-    quant.make_quant_attn(model)
-    if fused_mlp:
-        quant.make_fused_mlp(model)
+    if eval:
+        quant.make_quant_attn(model)
+        quant.make_quant_norm(model)
+        if fused_mlp:
+            quant.make_fused_mlp(model)
+
 
     if warmup_autotune:
         quant.autotune_warmup_linear(model)
