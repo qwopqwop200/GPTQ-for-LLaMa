@@ -309,9 +309,11 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
     else:
         model.load_state_dict(torch.load(checkpoint))
 
-    quant.make_quant_attn(model)
-    if eval and fused_mlp:
-        quant.make_fused_mlp(model)
+    if eval:
+        quant.make_quant_attn(model)
+        quant.make_quant_norm(model)
+        if fused_mlp:
+            quant.make_fused_mlp(model)
 
     if warmup_autotune:
         quant.autotune_warmup_linear(model, transpose=not (eval))
