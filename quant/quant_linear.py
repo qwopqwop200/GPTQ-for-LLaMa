@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.cuda.amp import custom_bwd, custom_fwd
-
+import quant_cuda
 try:
     import triton
     import triton.language as tl
@@ -300,13 +300,11 @@ class QuantLinearFunction(torch.autograd.Function):
             grad_input = transpose_matmul248(grad_output, qweight, scales, qzeros, g_idx, bits, maxq)
         return grad_input, None, None, None, None, None, None
 
-
 class QuantLinear(nn.Module):
-
-    def __init__(self, bits, groupsize, infeatures, outfeatures, bias):
+    def __init__(self, bits, groupsize, infeatures, outfeatures, bias, act_order=True):
         super().__init__()
-        if bits not in [2, 4, 8]:
-            raise NotImplementedError("Only 2,4,8 bits are supported.")
+        if bits not in [4]:
+            raise NotImplementedError("Only 4 bits are supported.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
@@ -321,6 +319,9 @@ class QuantLinear(nn.Module):
             self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
         else:
             self.bias = None
+        self.kernelswitch = 1
+        self.act_order = act_order
+        self.half_indim = self.infeatures // 2
 
     def pack(self, linear, scales, zeros, g_idx=None):
         self.g_idx = g_idx.clone() if g_idx is not None else self.g_idx
@@ -342,13 +343,13 @@ class QuantLinear(nn.Module):
         i = 0
         row = 0
         while row < qweight.shape[0]:
-            if self.bits in [2, 4, 8]:
+            if self.bits in [4]:
                 for j in range(i, i + (32 // self.bits)):
                     qweight[row] |= intweight[j] << (self.bits * (j - i))
                 i += 32 // self.bits
                 row += 1
             else:
-                raise NotImplementedError("Only 2,4,8 bits are supported.")
+                raise NotImplementedError("Only 4 bits are supported.")
 
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight)
@@ -359,25 +360,35 @@ class QuantLinear(nn.Module):
         i = 0
         col = 0
         while col < qzeros.shape[1]:
-            if self.bits in [2, 4, 8]:
+            if self.bits in [4]:
                 for j in range(i, i + (32 // self.bits)):
                     qzeros[:, col] |= zeros[:, j] << (self.bits * (j - i))
                 i += 32 // self.bits
                 col += 1
             else:
-                raise NotImplementedError("Only 2,4,8 bits are supported.")
+                raise NotImplementedError("Only 4 bits are supported.")
 
         qzeros = qzeros.astype(np.int32)
         self.qzeros = torch.from_numpy(qzeros)
 
     def forward(self, x):
         out_shape = x.shape[:-1] + (self.outfeatures, )
-        out = QuantLinearFunction.apply(x.reshape(-1, x.shape[-1]), self.qweight, self.scales, self.qzeros, self.g_idx, self.bits, self.maxq)
+        x = x.reshape(-1, x.shape[-1])
+        if x.shape[0] <= self.kernelswitch:
+            if self.act_order:
+                out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.half, device=x.device)
+                quant_cuda.vecquant4matmul_g(x, self.qweight, out, self.scales, self.qzeros, self.g_idx, self.half_indim)
+            else:
+                out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.float, device=x.device)
+                quant_cuda.vecquant4matmul(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize, self.half_indim)
+                out = out.half()
+        else:
+            out = QuantLinearFunction.apply(x, self.qweight, self.scales, self.qzeros, self.g_idx, self.bits, self.maxq)
         out = out + self.bias if self.bias is not None else out
         return out.reshape(out_shape)
 
 
-def make_quant_linear(module, names, bits, groupsize, name=''):
+def make_quant_linear(module, names, bits, groupsize,act_order=True, name=''):
     if isinstance(module, QuantLinear):
         return
     for attr in dir(module):
@@ -385,9 +396,9 @@ def make_quant_linear(module, names, bits, groupsize, name=''):
         name1 = name + '.' + attr if name != '' else attr
         if name1 in names:
             delattr(module, attr)
-            setattr(module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias is not None))
+            setattr(module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias is not None, act_order=act_order))
     for name1, child in module.named_children():
-        make_quant_linear(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
+        make_quant_linear(child, names, bits, groupsize,act_order, name + '.' + name1 if name != '' else name1)
 
 
 def autotune_warmup_linear(model, transpose=False):
