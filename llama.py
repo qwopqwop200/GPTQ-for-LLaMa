@@ -276,7 +276,7 @@ def llama_pack(model, quantizers, wbits, groupsize):
     return model
 
 
-def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True, warmup_autotune=True):
+def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True, warmup_autotune=True, act_order=True):
     from transformers import LlamaConfig, LlamaForCausalLM, modeling_utils
     config = LlamaConfig.from_pretrained(model)
 
@@ -298,7 +298,7 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
     for name in ['lm_head']:
         if name in layers:
             del layers[name]
-    quant.make_quant_linear(model, layers, wbits, groupsize)
+    quant.make_quant_linear(model, layers, wbits, groupsize, act_order)
 
     del layers
 
@@ -469,7 +469,7 @@ if __name__ == '__main__':
         args.load = args.load.as_posix()
 
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize, act_order=args.act_order)
     else:
         model = get_llama(args.model)
         model.eval()
