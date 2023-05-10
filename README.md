@@ -89,6 +89,7 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvi
 git clone https://github.com/qwopqwop200/GPTQ-for-LLaMa
 cd GPTQ-for-LLaMa
 pip install -r requirements.txt
+python setup_cuda.py install
 ```
 ## Dependencies
 
