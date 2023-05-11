@@ -320,7 +320,7 @@ class QuantLinear(nn.Module):
         else:
             self.bias = None
         self.kernelswitch = 1
-        self.act_order = act_order
+        self.act_order = (groupsize != -1) and act_order
         self.half_indim = self.infeatures // 2
 
     def pack(self, linear, scales, zeros, g_idx=None):
