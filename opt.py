@@ -2,6 +2,7 @@ import time
 
 import torch
 import torch.nn as nn
+import transformers
 
 from gptq import *
 from modelutils import *
