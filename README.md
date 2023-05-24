@@ -77,6 +77,46 @@ Depending on the GPUs/drivers, there may be a difference in performance, which d
 
 According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the difference in performance between FP16 and GPTQ decreases.
 
+## GPTQ vs bitsandbytes
+
+<details>
+<summary>LLaMA-7B(click me)</summary>
+
+| [LLaMA-7B(seqlen=2048)](https://arxiv.org/abs/2302.13971)       | Bits Per Weight(BPW)| memory(MiB) |  c4(ppl)  |
+| --------------------------------------------------------------- | ------------------- | ----------- | --------- |
+| FP16                                                            |  16                 |    13948    |    5.22   |
+| [GPTQ](https://arxiv.org/abs/2210.17323)                        |  4.15               |     4781    |    5.30   |
+| [nf4-double_quant](https://arxiv.org/abs/2305.14314)            |  4.127              |     4804    |    5.30   |
+| [nf4](https://arxiv.org/abs/2305.14314)                         |  4.5                |     5102    |    5.30   |
+| [fp4](https://arxiv.org/abs/2212.09720)                         |  4.5                |     5102    |    5.33   |
+
+</details>
+
+<details>
+<summary>LLaMA-13B</summary>
+
+| [LLaMA-13B(seqlen=2048)](https://arxiv.org/abs/2302.13971)       | Bits Per Weight(BPW)| memory(MiB) |  c4(ppl)  |
+| ---------------------------------------------------------------- | ------------------- | ----------- | --------- |
+| FP16                                                             |  16                 |     OOM     |     -     |
+| [GPTQ](https://arxiv.org/abs/2210.17323)                         |  4.15               |     8589    |    5.02   |
+| [nf4-double_quant](https://arxiv.org/abs/2305.14314)             |  4.127              |     8581    |    5.04   |
+| [nf4](https://arxiv.org/abs/2305.14314)                          |  4.5                |     9170    |    5.04   |
+| [fp4](https://arxiv.org/abs/2212.09720)                          |  4.5                |     9170    |    5.11   |  
+</details>
+
+<details>
+<summary>LLaMA-33B</summary>
+
+| [LLaMA-33B(seqlen=1024)](https://arxiv.org/abs/2302.13971)       | Bits Per Weight(BPW)| memory(MiB) |  c4(ppl)  |
+| ---------------------------------------------------------------- | ------------------- | ----------- | --------- |
+| FP16                                                             |  16                 |     OOM     |     -     |
+| [GPTQ](https://arxiv.org/abs/2210.17323)                         |  4.15               |    18441    |    3.71   |
+| [nf4-double_quant](https://arxiv.org/abs/2305.14314)             |  4.127              |    18313    |    3.76   |
+| [nf4](https://arxiv.org/abs/2305.14314)                          |  4.5                |    19729    |    3.75   |
+| [fp4](https://arxiv.org/abs/2212.09720)                          |  4.5                |    19729    |    3.75   |
+  
+</details>
+
 ## Installation
 If you don't have [conda](https://docs.conda.io/en/latest/miniconda.html), install it first.
 ```
