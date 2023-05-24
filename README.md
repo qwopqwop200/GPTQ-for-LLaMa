@@ -77,7 +77,7 @@ Depending on the GPUs/drivers, there may be a difference in performance, which d
 
 According to [GPTQ paper](https://arxiv.org/abs/2210.17323), As the size of the model increases, the difference in performance between FP16 and GPTQ decreases.
 
-## GPTQ vs bitsandbytes
+## GPTQ vs [bitsandbytes](https://github.com/TimDettmers/bitsandbytes)
 
 <details>
 <summary>LLaMA-7B(click me)</summary>
