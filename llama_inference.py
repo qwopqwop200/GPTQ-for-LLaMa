@@ -96,13 +96,15 @@ if __name__ == '__main__':
 
     parser.add_argument('--device', type=int, default=-1, help='The device used to load the model when using safetensors. Default device is "cpu" or specify, 0,1,2,3,... for GPU device.')
 
+    # fused mlp is not supported for safetensors
+    parser.add_argument('--fused_mlp', action='store_true', help='Use fused mlp for quantization.', default=True)
     args = parser.parse_args()
 
     if type(args.load) is not str:
         args.load = args.load.as_posix()
 
     if args.load:
-        model = load_quant(args.model, args.load, args.wbits, args.groupsize)
+        model = load_quant(args.model, args.load, args.wbits, args.groupsize, fused_mlp=args.fused_mlp)
     else:
         model = get_llama(args.model)
         model.eval()
