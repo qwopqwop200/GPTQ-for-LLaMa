@@ -48,21 +48,22 @@ class TritonLlamaRMSNorm(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, x):
-        y = torch.empty_like(x)
-        # reshape input data into 2D tensor
-        x_arg = x.reshape(-1, x.shape[-1])
-        M, N = x_arg.shape
-        # Less than 64KB per feature: enqueue fused kernel
-        MAX_FUSED_SIZE = 65536 // x.element_size()
-        BLOCK_SIZE = min(MAX_FUSED_SIZE, triton.next_power_of_2(N))
-        if N > BLOCK_SIZE:
-            raise RuntimeError("This layer norm doesn't support feature dim >= 64KB.")
-        # heuristics for number of warps
-        num_warps = min(max(BLOCK_SIZE // 256, 1), 8)
-        # enqueue kernel
-        rms_norm_fwd_fused[(M,)](x_arg, y, self.weight, 
-                                 x_arg.stride(0), N, self.variance_epsilon,
-                                 BLOCK_SIZE=BLOCK_SIZE, num_warps=num_warps)
+        with torch.cuda.device(x.device):
+            y = torch.empty_like(x)
+            # reshape input data into 2D tensor
+            x_arg = x.reshape(-1, x.shape[-1])
+            M, N = x_arg.shape
+            # Less than 64KB per feature: enqueue fused kernel
+            MAX_FUSED_SIZE = 65536 // x.element_size()
+            BLOCK_SIZE = min(MAX_FUSED_SIZE, triton.next_power_of_2(N))
+            if N > BLOCK_SIZE:
+                raise RuntimeError("This layer norm doesn't support feature dim >= 64KB.")
+            # heuristics for number of warps
+            num_warps = min(max(BLOCK_SIZE // 256, 1), 8)
+            # enqueue kernel
+            rms_norm_fwd_fused[(M,)](x_arg, y, self.weight, 
+                                    x_arg.stride(0), N, self.variance_epsilon,
+                                    BLOCK_SIZE=BLOCK_SIZE, num_warps=num_warps)
         return y
         
         
