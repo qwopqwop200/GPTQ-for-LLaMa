@@ -328,26 +328,33 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
 def llama_multigpu(model, gpus, gpu_dist):
     model.model.embed_tokens = model.model.embed_tokens.to(gpus[0])
     if hasattr(model.model, 'norm') and model.model.norm:
-        model.model.norm = model.model.norm.to(gpus[-1])
+        model.model.norm = model.model.norm.to(gpus[0])
     import copy
-    model.lm_head = copy.deepcopy(model.lm_head).to(gpus[-1])
+    model.lm_head = copy.deepcopy(model.lm_head).to(gpus[0])
 
-    cache = {'mask': None}
+    cache = {'mask': None, 'position_ids': None}
 
     class MoveModule(nn.Module):
 
-        def __init__(self, module):
+        def __init__(self, module, invalidate_cache):
             super().__init__()
             self.module = module
             self.dev = next(iter(self.module.parameters())).device
+            self.invalidate_cache=invalidate_cache
 
         def forward(self, *inp, **kwargs):
             inp = list(inp)
             if inp[0].device != self.dev:
                 inp[0] = inp[0].to(self.dev)
-            if cache['mask'] is None or cache['mask'].device != self.dev:
+
+            if cache['mask'] is None or cache['mask'].device != self.dev or self.invalidate_cache:
                 cache['mask'] = kwargs['attention_mask'].to(self.dev)
             kwargs['attention_mask'] = cache['mask']
+
+            if cache['position_ids'] is None or cache['position_ids'].device != self.dev or self.invalidate_cache:
+                cache['position_ids'] = kwargs['position_ids'].to(self.dev)
+            kwargs['position_ids'] = cache['position_ids']
+            
             tmp = self.module(*inp, **kwargs)
             return tmp
 
@@ -356,18 +363,21 @@ def llama_multigpu(model, gpus, gpu_dist):
     if not gpu_dist:
         pergpu = ceil(len(layers) / len(gpus))
         for i in range(len(layers)):
-            layers[i] = MoveModule(layers[i].to(gpus[i // pergpu]))
+            layers[i] = MoveModule(layers[i].to(0 if i == 0 or i == len(layers) -1 else gpus[(i-1) // pergpu]), i==0)
     else:
-        assigned_gpus = []
-        for i in range(len(gpu_dist)):
+        assert gpu_dist[0] >= 2, "At least two layers must be on GPU 0."
+        assigned_gpus = [0] * (gpu_dist[0]-1)
+        for i in range(1, len(gpu_dist)):
             assigned_gpus = assigned_gpus + [i] * gpu_dist[i]
 
-        remaining_assignments = len(layers)-len(assigned_gpus)
+        remaining_assignments = len(layers)-len(assigned_gpus) - 1
         if remaining_assignments > 0:
             assigned_gpus = assigned_gpus + [-1] * remaining_assignments
 
+        assigned_gpus = assigned_gpus + [0]
+
         for i in range(len(layers)):
-            layers[i] = MoveModule(layers[i].to(gpus[assigned_gpus[i]]))
+            layers[i] = MoveModule(layers[i].to(gpus[assigned_gpus[i]]), i==0)
 
     model.gpus = gpus
 
@@ -442,6 +452,7 @@ if __name__ == '__main__':
     parser.add_argument('--trits', action='store_true', help='Whether to use trits for quantization.')
     parser.add_argument('--groupsize', type=int, default=-1, help='Groupsize to use for quantization; default uses full row.')
     parser.add_argument('--eval', action='store_true', help='evaluate quantized model.')
+    parser.add_argument('--test-generation', action='store_true', help='test generation.')
     parser.add_argument('--save', type=str, default='', help='Save quantized checkpoint under this name.')
     parser.add_argument('--save_safetensors', type=str, default='', help='Save quantized `.safetensors` checkpoint under this name.')
     parser.add_argument('--load', type=str, default='', help='Load quantized model.')
@@ -499,6 +510,22 @@ if __name__ == '__main__':
             dataloader, testloader = get_loaders(dataset, seed=args.seed, model=args.model, seqlen=model.seqlen)
             print(dataset)
             llama_eval(model, testloader, DEV)
+    
+    if args.test_generation:
+        gpus = [torch.device('cuda:%d' % i) for i in range(torch.cuda.device_count())]
+        if len(gpus) > 1:
+            llama_multigpu(model, gpus, gpu_dist)
+        else:
+            model = model.to(DEV)
+
+        from transformers import LlamaTokenizer, TextStreamer
+        tokenizer = LlamaTokenizer.from_pretrained(args.model, use_fast=False)
+        input_ids = tokenizer(["The capital of New Mexico is"], return_tensors="pt").input_ids.to(gpus[0])
+        streamer = TextStreamer(tokenizer)
+        with torch.no_grad():
+            generated_ids = model.generate(input_ids, streamer=streamer)
+        
+
 
     if args.quant_directory is not None:
         export_quant_table(quantizers, args.quant_directory)
