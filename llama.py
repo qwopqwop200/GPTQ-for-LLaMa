@@ -276,7 +276,7 @@ def llama_pack(model, quantizers, wbits, groupsize):
     return model
 
 
-def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True, warmup_autotune=False):
+def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True, warmup_autotune=True):
     from transformers import LlamaConfig, LlamaForCausalLM, modeling_utils
     config = LlamaConfig.from_pretrained(model)
 
